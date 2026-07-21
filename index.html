@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SoulKit Blog Manager</title>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
     /* ── Reset & Base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -117,6 +121,11 @@
 
     .btn:hover  { background: var(--accent-hover); }
     .btn:active { transform: scale(.97); }
+    .btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .btn:disabled:hover { background: var(--accent); transform: none; }
 
     .btn-secondary {
       background: var(--bg-card);
@@ -127,6 +136,10 @@
     .btn-secondary:hover {
       background: var(--tab-active-bg);
       border-color: var(--accent-dim);
+    }
+    .btn-secondary:disabled:hover {
+      background: var(--bg-card);
+      border-color: var(--border-light);
     }
 
     .btn-naver {
@@ -144,6 +157,56 @@
     }
 
     .btn-danger:hover { background: rgba(231,76,60,.12); }
+
+    /* ── Google Login Button ── */
+    .btn-google {
+      background: #fff;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, box-shadow .15s;
+      flex-shrink: 0;
+    }
+    .btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+    .btn-google svg { flex-shrink: 0; }
+
+    .btn-google-signout {
+      background: var(--bg-card);
+      color: var(--accent-dim);
+      border: 1px solid var(--border-light);
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    .btn-google-signout:hover { background: var(--tab-active-bg); }
+
+    .google-user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .google-user-email {
+      font-size: 12px;
+      color: var(--accent-dim);
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     /* ── Tabs ── */
     .tabs-row {
@@ -266,32 +329,85 @@
       position: relative;
     }
 
-    /* ── Blogger iframe panel ── */
-    .blogger-iframe {
-      width: 100%;
+    /* ── Post List (Left Panel) ── */
+    .post-list-wrap {
+      display: flex;
+      flex-direction: column;
       height: 100%;
-      border: none;
-      display: block;
     }
 
-    .iframe-overlay {
-      position: absolute;
-      inset: 0;
+    .post-list-auth-notice {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 12px;
+      height: 100%;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .post-list-auth-notice .lock-icon {
+      font-size: 32px;
+      opacity: .5;
+    }
+
+    .post-list-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      height: 100%;
       color: var(--text-muted);
       font-size: 13px;
     }
 
-    .iframe-overlay .blog-url {
-      font-size: 11px;
+    .post-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .post-list-item {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .12s;
+    }
+
+    .post-list-item:hover {
+      background: var(--bg-card);
+    }
+
+    .post-list-item.active {
+      background: var(--tab-active-bg);
+      border-left: 2px solid var(--accent);
+    }
+
+    .post-list-item .post-item-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 3px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .post-list-item .post-item-date {
+      font-size: 10px;
       color: var(--text-muted);
-      word-break: break-all;
+    }
+
+    .post-list-empty {
+      padding: 24px 14px;
       text-align: center;
-      padding: 0 20px;
+      color: var(--text-muted);
+      font-size: 12px;
     }
 
     /* ── Editor panel ── */
@@ -472,7 +588,7 @@
 <body>
 <div class="app">
 
-  <!-- ── Header: Logo + Smartstore Bar ── -->
+  <!-- ── Header: Logo + Smartstore Bar + Google Login ── -->
   <header class="header">
     <div class="logo">SoulKit <span>Blog Manager</span></div>
 
@@ -484,6 +600,25 @@
         placeholder="https://smartstore.naver.com/..."
       />
       <button class="btn" onclick="handleStartWork()">▶ 작업 시작</button>
+    </div>
+
+    <!-- Google Login / User Info (right side) -->
+    <div id="google-login-area">
+      <!-- Logged out state -->
+      <button class="btn-google" id="btn-google-login" onclick="googleLogin()">
+        <svg width="16" height="16" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        구글 로그인
+      </button>
+      <!-- Logged in state -->
+      <div class="google-user-info hidden" id="google-user-info">
+        <span class="google-user-email" id="google-user-email"></span>
+        <button class="btn-google-signout" onclick="googleSignOut()">로그아웃</button>
+      </div>
     </div>
   </header>
 
@@ -507,29 +642,29 @@
   <main class="main">
     <div class="panel-container">
 
-      <!-- ── LEFT: Blogger iframe ── -->
+      <!-- ── LEFT: Blogger Post List ── -->
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">구글 블로그 (최신 발행글)</span>
+          <span class="panel-title">구글 블로그 (최근 글)</span>
           <span class="panel-badge" id="blogger-badge">Blogger</span>
-          <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="loadBloggerPost()">새로고침</button>
+          <button class="btn btn-secondary" id="btn-refresh-posts" style="padding:4px 10px;font-size:11px;" onclick="loadPostList()">새로고침</button>
         </div>
-        <div class="panel-body" id="blogger-panel-body">
-          <!-- iframe will be injected here -->
-          <div class="iframe-overlay" id="blogger-placeholder">
-            <div class="spinner"></div>
-            <span>블로그 로딩 중...</span>
-            <span class="blog-url" id="blogger-url-display"></span>
+        <div class="panel-body">
+          <div class="post-list-wrap">
+            <!-- Unauthenticated notice -->
+            <div class="post-list-auth-notice" id="post-list-auth-notice">
+              <div class="lock-icon">🔒</div>
+              <div>구글 로그인이 필요합니다</div>
+              <div style="font-size:11px;">우측 상단에서 구글 계정으로 로그인하면<br/>블로그 글 목록을 불러올 수 있습니다.</div>
+            </div>
+            <!-- Loading state -->
+            <div class="post-list-loading hidden" id="post-list-loading">
+              <div class="spinner"></div>
+              <span>글 목록 불러오는 중...</span>
+            </div>
+            <!-- Post list -->
+            <div class="post-list hidden" id="post-list"></div>
           </div>
-          <!-- NOTE: 실제 최신 글 불러오기는 추후 n8n 엔드포인트 연결 예정.
-               현재는 iframe으로 블로그 메인 페이지를 표시합니다.
-               일부 Blogger 사이트는 X-Frame-Options 정책으로 iframe 차단될 수 있음. -->
-          <iframe
-            id="blogger-iframe"
-            class="blogger-iframe hidden"
-            title="Blogger Preview"
-            sandbox="allow-same-origin allow-scripts allow-popups"
-          ></iframe>
         </div>
       </div>
 
@@ -543,19 +678,15 @@
         <div class="panel-body">
           <div class="editor-wrap">
 
-            <!-- Mock post info — 실제 글 데이터는 추후 Blogger API / n8n 연동 예정 -->
             <div class="mock-post-info">
               <div class="mock-post-title" id="editor-post-title">
-                [샘플] 신상품 소개 — 00월 00일 발행
+                글을 선택하면 본문이 로드됩니다
               </div>
               <div class="mock-post-meta" id="editor-post-meta">
-                ※ 왼쪽 패널에서 글을 선택하면 본문이 로드됩니다 (추후 연동 예정)
+                ← 왼쪽 패널에서 글을 클릭하세요
               </div>
             </div>
 
-            <!-- NOTE: 최신 글 불러오기(Blogger → Editor) 기능은
-                 추후 POST /webhook/get-blogger-post (n8n) 연동 예정.
-                 현재는 mock HTML로 자리를 잡아둡니다. -->
             <textarea
               id="html-editor"
               class="html-editor"
@@ -566,8 +697,7 @@
             <div class="editor-footer">
               <span class="status" id="editor-status">준비됨</span>
               <button class="btn btn-secondary" onclick="formatHtml()">정렬</button>
-              <!-- NOTE: 저장(재발행) 기능은 추후 POST /webhook/republish-blogger-post (n8n) 연동 예정 -->
-              <button class="btn" onclick="handleSavePost()">💾 저장 (재발행)</button>
+              <button class="btn" id="btn-save-post" onclick="handleSavePost()" disabled>💾 저장 (재발행)</button>
             </div>
 
           </div>
@@ -619,38 +749,54 @@
      SoulKit Blog Manager — Client Script
      ======================================================== */
 
+  // ── Google OAuth Client ID ─────────────────────────────
+  // TODO: 사용자가 Google Cloud Console에서 발급 후 여기에 붙여넣기
+  // https://console.cloud.google.com/ → APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client IDs
+  // Application type: Web application, Authorized JavaScript origins에 현재 도메인 추가 필요
+  const GOOGLE_CLIENT_ID = 'PASTE_YOUR_CLIENT_ID_HERE.apps.googleusercontent.com'; // TODO: 사용자가 Google Cloud Console에서 발급 후 여기에 붙여넣기
+
+  // ── Blogger Blog ID 매핑 ────────────────────────────────
+  const BLOG_IDS = {
+    '소울스토리':   '2396484015719094670',
+    '제이원매거진': '28523961425985497',
+    '개인AILAB':    '3458876509383289721',
+    '행복라이프':   '1187991556527952647',
+  };
+
   // ── 사업자 설정 ──────────────────────────────────────────
   const BUSINESSES = {
     '소울스토어': {
       blogger: {
-        label: '소울스토리',
-        url:   'https://soulstory3.blogspot.com',
+        label:  '소울스토리',
+        blogId: BLOG_IDS['소울스토리'],
+        url:    'https://soulstory3.blogspot.com',
       },
       naver: {
-        blogId: 'soulstore',          // TODO: 실제 네이버 아이디로 교체
+        blogId: 'soulstore',
         label:  '소울스토어 네이버 블로그',
       },
     },
     '제이원투몰': {
-      // 내부 토글로 두 블로그 선택
       blogs: {
         '제이원매거진': {
           blogger: {
-            label: '제이원매거진',
-            url:   'https://jonemagazine.blogspot.com',
+            label:  '제이원매거진',
+            blogId: BLOG_IDS['제이원매거진'],
+            url:    'https://jonemagazine.blogspot.com',
           },
           naver: {
-            blogId: 'jonemagazine',   // TODO: 실제 네이버 아이디로 교체
+            blogId: 'jonemagazine',
             label:  '제이원매거진 네이버 블로그',
           },
         },
         '개인AILAB': {
           blogger: {
-            label: '개인AILAB',
-            url:   'https://wonflowai.blogspot.com',
+            label:  '개인AILAB',
+            blogId: BLOG_IDS['개인AILAB'],
+            url:    'https://wonflowai.blogspot.com',
           },
           naver: {
-            blogId: 'wonflowai',      // TODO: 실제 네이버 아이디로 교체
+            blogId: 'wonflowai',
             label:  '개인AILAB 네이버 블로그',
           },
         },
@@ -658,28 +804,86 @@
     },
     '행복산업': {
       blogger: {
-        label: '행복라이프',
-        url:   'https://happybizlife.blogspot.com',
+        label:  '행복라이프',
+        blogId: BLOG_IDS['행복라이프'],
+        url:    'https://happybizlife.blogspot.com',
       },
       naver: {
-        blogId: 'happybizlife',       // TODO: 실제 네이버 아이디로 교체
+        blogId: 'happybizlife',
         label:  '행복산업 네이버 블로그',
       },
     },
   };
 
-  // n8n webhook endpoint
+  // n8n webhook endpoint (기존 스마트스토어 작업 시작용)
   const WEBHOOK_URL = 'https://n8n.wonflowai.com/webhook/happyj1-blog-register';
 
   // ── State ──────────────────────────────────────────────
-  let currentMall   = '소울스토어';
+  let currentMall    = '소울스토어';
   let currentJ12Blog = '제이원매거진';
+  let accessToken    = null;   // 메모리에만 보관, localStorage 저장 안 함
+  let tokenClient    = null;
+  let currentPostId  = null;   // 현재 편집 중인 postId
+  let currentBlogId  = null;   // 현재 선택된 blogId
 
   // ── Init ──────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
     applyMall('소울스토어');
-    loadMockEditorContent();
+    updateAuthUI();
   });
+
+  // ── Google OAuth ───────────────────────────────────────
+  function googleLogin() {
+    if (!tokenClient) {
+      // GIS 스크립트가 아직 로드 중이면 잠시 후 재시도
+      if (typeof google === 'undefined' || !google.accounts) {
+        showToast('Google Identity Services 로딩 중입니다. 잠시 후 다시 시도하세요.', true);
+        return;
+      }
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/blogger',
+        callback: (tokenResponse) => {
+          if (tokenResponse.error) {
+            showToast('Google 로그인 실패: ' + tokenResponse.error, true);
+            return;
+          }
+          accessToken = tokenResponse.access_token;
+          updateAuthUI(true);
+          showToast('✅ Google 로그인 성공');
+          loadPostList();
+        },
+      });
+    }
+    tokenClient.requestAccessToken();
+  }
+
+  function googleSignOut() {
+    if (accessToken) {
+      google.accounts.oauth2.revoke(accessToken, () => {});
+    }
+    accessToken = null;
+    tokenClient = null;
+    currentPostId = null;
+    updateAuthUI(false);
+    resetEditor();
+    renderPostListAuth(); // show auth notice
+    showToast('로그아웃 되었습니다.');
+  }
+
+  function updateAuthUI(isLoggedIn) {
+    const loggedOut = isLoggedIn === false || !accessToken;
+    document.getElementById('btn-google-login').classList.toggle('hidden', !loggedOut);
+    document.getElementById('google-user-info').classList.toggle('hidden', loggedOut);
+
+    // 저장 버튼 활성화: 로그인 + 포스트 선택 시
+    updateSaveButton();
+  }
+
+  function updateSaveButton() {
+    const canSave = !!accessToken && !!currentPostId;
+    document.getElementById('btn-save-post').disabled = !canSave;
+  }
 
   // ── Tab switching ──────────────────────────────────────
   function switchTab(el) {
@@ -690,6 +894,8 @@
     const toggle = document.getElementById('j12-toggle');
     toggle.classList.toggle('hidden', currentMall !== '제이원투몰');
 
+    currentPostId = null;
+    updateSaveButton();
     applyMall(currentMall);
   }
 
@@ -697,15 +903,24 @@
     document.querySelectorAll('.toggle-option').forEach(o => o.classList.remove('selected'));
     el.classList.add('selected');
     currentJ12Blog = el.dataset.blog;
+    currentPostId = null;
+    updateSaveButton();
     applyMall('제이원투몰');
   }
 
   // ── Apply mall configuration ───────────────────────────
   function applyMall(mall) {
     const cfg = getBloggerConfig();
-    renderBloggerPanel(cfg.blogger);
+    currentBlogId = cfg.blogger.blogId;
+    document.getElementById('blogger-badge').textContent = cfg.blogger.label;
     renderNaverPanel(cfg.naver);
-    loadMockEditorContent();
+    resetEditor();
+
+    if (accessToken) {
+      loadPostList();
+    } else {
+      renderPostListAuth();
+    }
   }
 
   function getBloggerConfig() {
@@ -715,41 +930,132 @@
     return BUSINESSES[currentMall];
   }
 
-  // ── Blogger panel ──────────────────────────────────────
-  function renderBloggerPanel(cfg) {
-    const badge   = document.getElementById('blogger-badge');
-    const urlDisp = document.getElementById('blogger-url-display');
-    badge.textContent     = cfg.label;
-    urlDisp.textContent   = cfg.url;
-
-    loadBloggerPost(cfg.url);
+  // ── Post List (Left Panel) ─────────────────────────────
+  function renderPostListAuth() {
+    document.getElementById('post-list-auth-notice').classList.remove('hidden');
+    document.getElementById('post-list-loading').classList.add('hidden');
+    document.getElementById('post-list').classList.add('hidden');
   }
 
-  function loadBloggerPost(overrideUrl) {
-    const cfg = getBloggerConfig();
-    const url = overrideUrl || cfg.blogger.url;
+  function renderPostListLoading() {
+    document.getElementById('post-list-auth-notice').classList.add('hidden');
+    document.getElementById('post-list-loading').classList.remove('hidden');
+    document.getElementById('post-list').classList.add('hidden');
+  }
 
-    const placeholder = document.getElementById('blogger-placeholder');
-    const iframe      = document.getElementById('blogger-iframe');
+  function renderPostListItems(posts) {
+    document.getElementById('post-list-auth-notice').classList.add('hidden');
+    document.getElementById('post-list-loading').classList.add('hidden');
 
-    placeholder.classList.remove('hidden');
-    iframe.classList.add('hidden');
+    const listEl = document.getElementById('post-list');
+    listEl.classList.remove('hidden');
+    listEl.innerHTML = '';
 
-    // NOTE: 추후 n8n GET /webhook/get-latest-blogger-post 연동 시 실제 글 데이터로 대체.
-    // 현재는 iframe으로 블로그 메인 페이지 표시.
-    // Blogger의 X-Frame-Options 정책에 따라 일부 블로그는 iframe 표시가 차단될 수 있습니다.
-    iframe.src = '';
-    setTimeout(() => {
-      iframe.src = url;
-      iframe.onload = () => {
-        placeholder.classList.add('hidden');
-        iframe.classList.remove('hidden');
-      };
-      iframe.onerror = () => {
-        document.getElementById('blogger-url-display').textContent =
-          '⚠ iframe 차단됨. 아래 URL을 직접 열어주세요: ' + url;
-      };
-    }, 300);
+    if (!posts || posts.length === 0) {
+      listEl.innerHTML = '<div class="post-list-empty">글이 없습니다.</div>';
+      return;
+    }
+
+    posts.forEach(post => {
+      const item = document.createElement('div');
+      item.className = 'post-list-item';
+      item.dataset.postId = post.id;
+
+      const published = post.published
+        ? new Date(post.published).toLocaleDateString('ko-KR')
+        : '';
+
+      item.innerHTML = `
+        <div class="post-item-title">${escapeHtml(post.title)}</div>
+        <div class="post-item-date">${published}</div>
+      `;
+
+      item.addEventListener('click', () => selectPost(post.id, item));
+      listEl.appendChild(item);
+    });
+  }
+
+  async function loadPostList() {
+    if (!accessToken) { renderPostListAuth(); return; }
+
+    const blogId = currentBlogId;
+    if (!blogId) { showToast('blogId가 없습니다.', true); return; }
+
+    renderPostListLoading();
+
+    try {
+      const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?maxResults=15`;
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (res.status === 401) {
+        accessToken = null;
+        updateAuthUI(false);
+        renderPostListAuth();
+        showToast('인증이 만료되었습니다. 다시 로그인하세요.', true);
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      renderPostListItems(data.items || []);
+    } catch (err) {
+      document.getElementById('post-list-loading').classList.add('hidden');
+      document.getElementById('post-list').classList.remove('hidden');
+      document.getElementById('post-list').innerHTML =
+        `<div class="post-list-empty">글 목록 로드 실패:<br/>${escapeHtml(err.message)}</div>`;
+      showToast('글 목록 로드 실패: ' + err.message, true);
+    }
+  }
+
+  async function selectPost(postId, itemEl) {
+    // Highlight selected item
+    document.querySelectorAll('.post-list-item').forEach(el => el.classList.remove('active'));
+    itemEl.classList.add('active');
+
+    currentPostId = postId;
+    updateSaveButton();
+    setEditorStatus('글 로딩 중...');
+
+    try {
+      const url = `https://www.googleapis.com/blogger/v3/blogs/${currentBlogId}/posts/${postId}`;
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (res.status === 401) {
+        accessToken = null;
+        updateAuthUI(false);
+        renderPostListAuth();
+        showToast('인증이 만료되었습니다. 다시 로그인하세요.', true);
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+
+      const post = await res.json();
+
+      document.getElementById('editor-post-title').textContent = post.title || '(제목 없음)';
+      document.getElementById('editor-post-meta').textContent =
+        `발행일: ${post.published ? new Date(post.published).toLocaleString('ko-KR') : '알 수 없음'}`;
+
+      const editor = document.getElementById('html-editor');
+      editor.value = post.content || '';
+      editor.dataset.isMock = 'false';
+
+      setEditorStatus('로드 완료');
+    } catch (err) {
+      setEditorStatus('로드 실패: ' + err.message);
+      showToast('글 로드 실패: ' + err.message, true);
+    }
   }
 
   // ── Naver panel ────────────────────────────────────────
@@ -768,25 +1074,16 @@
     showToast(`네이버 블로그 글쓰기 열기: ${blogId}`);
   }
 
-  // ── HTML Editor (mock) ────────────────────────────────
-  // NOTE: 실제 최신 글 본문 불러오기는 추후 n8n 엔드포인트 연동 예정
-  const MOCK_HTML = `<h2>샘플 블로그 포스트 제목</h2>
-<p>이 영역은 구글 블로그(Blogger)의 최신 발행글 본문이 자동으로 로드되는 자리입니다.</p>
-<p><strong>주요 특징</strong></p>
-<ul>
-  <li>고품질 소재 사용</li>
-  <li>합리적인 가격</li>
-  <li>빠른 배송</li>
-</ul>
-<p>지금 바로 스마트스토어에서 확인해 보세요!</p>`;
-
-  function loadMockEditorContent() {
+  // ── HTML Editor ───────────────────────────────────────
+  function resetEditor() {
+    document.getElementById('editor-post-title').textContent = '글을 선택하면 본문이 로드됩니다';
+    document.getElementById('editor-post-meta').textContent = '← 왼쪽 패널에서 글을 클릭하세요';
     const editor = document.getElementById('html-editor');
-    if (!editor.value || editor.dataset.isMock === 'true') {
-      editor.value = MOCK_HTML;
-      editor.dataset.isMock = 'true';
-    }
-    setEditorStatus('준비됨 (샘플 데이터)');
+    editor.value = '';
+    editor.dataset.isMock = 'false';
+    setEditorStatus('준비됨');
+    currentPostId = null;
+    updateSaveButton();
   }
 
   function setEditorStatus(msg) {
@@ -796,7 +1093,6 @@
   function formatHtml() {
     const el = document.getElementById('html-editor');
     try {
-      // Simple indent-based formatter (no external dep)
       let html = el.value;
       let indent = 0;
       html = html
@@ -819,23 +1115,56 @@
     }
   }
 
-  // NOTE: 저장(재발행) 기능은 추후 POST /webhook/republish-blogger-post (n8n) 연동 예정.
-  // 현재는 UI 자리만 잡아둡니다.
-  function handleSavePost() {
+  async function handleSavePost() {
+    if (!accessToken) {
+      showToast('구글 로그인이 필요합니다.', true);
+      return;
+    }
+    if (!currentPostId) {
+      showToast('저장할 글이 선택되지 않았습니다.', true);
+      return;
+    }
+
     const html = document.getElementById('html-editor').value;
     if (!html.trim()) { showToast('본문 내용이 없습니다.', true); return; }
 
     setEditorStatus('저장 중...');
-    // TODO: 실제 n8n 엔드포인트 연동 시 아래 fetch 주석 해제
-    // fetch('https://n8n.wonflowai.com/webhook/republish-blogger-post', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ mall: currentMall, html }),
-    // })
-    setTimeout(() => {
-      setEditorStatus('✅ 저장됨 (mock — 실제 재발행 미연결)');
-      showToast('저장 완료 (mock)');
-    }, 800);
+    document.getElementById('btn-save-post').disabled = true;
+
+    try {
+      const url = `https://www.googleapis.com/blogger/v3/blogs/${currentBlogId}/posts/${currentPostId}`;
+      const title = document.getElementById('editor-post-title').textContent;
+
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ kind: 'blogger#post', id: currentPostId, title, content: html }),
+      });
+
+      if (res.status === 401) {
+        accessToken = null;
+        updateAuthUI(false);
+        renderPostListAuth();
+        showToast('인증이 만료되었습니다. 다시 로그인하세요.', true);
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+
+      setEditorStatus('✅ 저장 완료 (재발행됨)');
+      showToast('✅ 글이 성공적으로 저장(재발행)되었습니다.');
+    } catch (err) {
+      setEditorStatus('저장 실패: ' + err.message);
+      showToast('저장 실패: ' + err.message, true);
+    } finally {
+      updateSaveButton();
+    }
   }
 
   // ── Smartstore → n8n webhook ──────────────────────────
@@ -849,15 +1178,14 @@
       return;
     }
 
-    // Extract itemNo from URL (e.g., /products/12345678)
     const itemNoMatch = rawUrl.match(/\/products\/(\d+)/);
     const itemNo = itemNoMatch ? itemNoMatch[1] : '';
 
     const payload = {
       itemNo,
       mall:           currentMall,
-      product_name:   '',   // n8n이 URL에서 자동 추출 예정
-      keywords:       '',   // n8n이 자동 생성 예정
+      product_name:   '',
+      keywords:       '',
       smartstore_url: rawUrl,
     };
 
@@ -879,6 +1207,15 @@
       showToast(`❌ 전송 실패: ${err.message}`, true);
       console.error('[SoulKit] webhook error:', err);
     }
+  }
+
+  // ── Utilities ─────────────────────────────────────────
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   // ── Toast helper ──────────────────────────────────────
