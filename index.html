@@ -715,7 +715,7 @@
             <div class="naver-icon">N</div>
             <div class="naver-blog-id" id="naver-blog-id-display">blog.naver.com/soulstore</div>
             <div class="naver-desc" id="naver-desc">
-              네이버 블로그 글쓰기 페이지를<br/>모바일 팝업으로 엽니다.
+              네이버 블로그 글쓰기 페이지를<br/>팝업으로 엽니다.
             </div>
 
             <div class="naver-divider"></div>
@@ -1063,20 +1063,19 @@
     document.getElementById('naver-blog-id-display').textContent =
       `blog.naver.com/${cfg.blogId}`;
     document.getElementById('naver-desc').innerHTML =
-      `<strong>${cfg.label}</strong><br/>네이버 블로그 글쓰기 페이지를<br/>모바일 팝업으로 엽니다.`;
+      `<strong>${cfg.label}</strong><br/>네이버 블로그 글쓰기 페이지를<br/>팝업으로 엽니다.`;
   }
 
   function openNaverWrite() {
     const cfg = getBloggerConfig();
     const blogId = cfg.naver.blogId;
-    const writeUrl = `https://m.blog.naver.com/PostWriteForm.naver?blogId=${blogId}`;
+    const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${blogId}`;
 
-    const popupW = 420;
-    const popupH = 850;
-
-    // 오른쪽 네이버 패널의 화면상 실제 좌표 계산 (screenX/Y 보정 포함)
+    // 오른쪽 네이버 패널의 화면상 실제 좌표 및 크기 계산 (screenX/Y 보정 포함)
     const panelEl = document.getElementById('naver-panel');
-    const rect = panelEl ? panelEl.getBoundingClientRect() : { left: 0, top: 0 };
+    const rect = panelEl ? panelEl.getBoundingClientRect() : { left: 0, top: 0, width: 420, height: 850 };
+    const popupW = Math.round(rect.width);
+    const popupH = Math.round(rect.height);
     const screenLeft = window.screenX !== undefined ? window.screenX : (window.screenLeft || 0);
     const screenTop  = window.screenY !== undefined ? window.screenY : (window.screenTop  || 0);
     const chromeBarH = window.outerHeight - window.innerHeight;
