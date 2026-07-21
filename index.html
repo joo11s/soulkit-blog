@@ -451,6 +451,73 @@
       color: var(--accent);
     }
 
+    /* ── Image download: bulk button ── */
+    .img-download-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .btn-img-download-all {
+      background: var(--bg-input);
+      color: var(--accent);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, border-color .15s;
+    }
+
+    .btn-img-download-all:hover {
+      background: var(--tab-active-bg);
+      border-color: var(--accent-dim);
+    }
+
+    /* ── Image download: individual overlay ── */
+    .preview-img-wrap {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      margin: 4px 0;
+    }
+
+    .preview-img-wrap img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .btn-img-dl-single {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 4px 7px;
+      font-size: 13px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity .15s, background .15s;
+      line-height: 1;
+    }
+
+    .preview-img-wrap:hover .btn-img-dl-single {
+      opacity: 1;
+    }
+
+    .btn-img-dl-single:hover {
+      background: rgba(0,0,0,0.80);
+    }
+
     .post-list-item .post-item-title-row {
       display: flex;
       align-items: flex-start;
@@ -1201,6 +1268,7 @@
 
       if (post.content) {
         previewEl.innerHTML = post.content;
+        injectImageDownloadUI(previewEl, post.title || '');
         previewEl.classList.add('open');
       } else {
         previewEl.innerHTML = '<em style="color:var(--text-muted)">미리보기 로드 중...</em>';
@@ -1253,6 +1321,7 @@
       // Update accordion preview with full content (rendered HTML)
       if (previewEl && accordionOpenPostId === postId) {
         previewEl.innerHTML = post.content || '<em style="color:var(--text-muted)">내용 없음</em>';
+        injectImageDownloadUI(previewEl, post.title || '');
       }
 
       setEditorStatus('로드 완료');
@@ -1434,6 +1503,133 @@
     } catch (err) {
       showToast(`❌ 전송 실패: ${err.message}`, true);
       console.error('[SoulKit] webhook error:', err);
+    }
+  }
+
+  // ── Image Download Helpers ────────────────────────────
+
+  /**
+   * Parse all <img> src values from an HTML string.
+   * Returns an array of src strings.
+   */
+  function parseImgSrcs(htmlStr) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = htmlStr;
+    return Array.from(tmp.querySelectorAll('img'))
+      .map(img => img.getAttribute('src'))
+      .filter(Boolean);
+  }
+
+  /**
+   * Sanitize a string to be used as part of a filename.
+   * Removes characters that are not alphanumeric, spaces, hyphens, or underscores.
+   */
+  function sanitizeFilename(str) {
+    return str.replace(/[^\w\s가-힣\-]/g, '').trim();
+  }
+
+  /**
+   * Derive an extension from a URL or default to 'png'.
+   */
+  function getImgExt(url) {
+    try {
+      const pathname = new URL(url).pathname;
+      const ext = pathname.split('.').pop().split('?')[0].toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+        return ext === 'jpeg' ? 'jpg' : ext;
+      }
+    } catch (_) { /* ignore */ }
+    return 'png';
+  }
+
+  /**
+   * Download a single image by src, using given filename.
+   * Falls back to window.open on CORS / fetch failure.
+   */
+  async function downloadImage(src, filename) {
+    try {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    } catch (_) {
+      // CORS or network failure — open in new tab as fallback
+      window.open(src, '_blank');
+    }
+  }
+
+  /**
+   * Download all images from the current accordion preview sequentially.
+   * Triggered by the bulk download button.
+   */
+  async function downloadAllImages(srcs, postTitle) {
+    const baseName = sanitizeFilename(postTitle || '이미지');
+    for (let i = 0; i < srcs.length; i++) {
+      const ext = getImgExt(srcs[i]);
+      const filename = `${baseName}_${i + 1}.${ext}`;
+      await downloadImage(srcs[i], filename);
+    }
+  }
+
+  /**
+   * Inject image download UI into a preview element.
+   * - Wraps each <img> in a relative container with an individual download button.
+   * - Prepends a bulk "download all" bar if there are 1+ images.
+   */
+  function injectImageDownloadUI(previewEl, postTitle) {
+    // Wrap each img with overlay container
+    const imgs = previewEl.querySelectorAll('img');
+    if (imgs.length === 0) return;
+
+    const srcs = [];
+    imgs.forEach((img, idx) => {
+      const src = img.getAttribute('src');
+      if (!src) return;
+      srcs.push(src);
+
+      const baseName = sanitizeFilename(postTitle || '이미지');
+      const ext = getImgExt(src);
+      const filename = `${baseName}_${idx + 1}.${ext}`;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'preview-img-wrap';
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'btn-img-dl-single';
+      dlBtn.title = '이미지 다운로드';
+      dlBtn.textContent = '⬇';
+      dlBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadImage(src, filename);
+      });
+
+      img.parentNode.insertBefore(wrap, img);
+      wrap.appendChild(img);
+      wrap.appendChild(dlBtn);
+    });
+
+    // Prepend bulk download bar
+    if (srcs.length > 0) {
+      const bar = document.createElement('div');
+      bar.className = 'img-download-bar';
+
+      const allBtn = document.createElement('button');
+      allBtn.className = 'btn-img-download-all';
+      allBtn.textContent = `🖼 이미지 ${srcs.length}개 전체 다운로드`;
+      allBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        downloadAllImages(srcs, postTitle);
+      });
+
+      bar.appendChild(allBtn);
+      previewEl.insertBefore(bar, previewEl.firstChild);
     }
   }
 
