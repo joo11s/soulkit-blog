@@ -410,6 +410,19 @@
       font-size: 12px;
     }
 
+    /* ── Load More Button ── */
+    .load-more-wrap {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .load-more-wrap .btn {
+      width: 100%;
+      font-size: 12px;
+      padding: 7px 12px;
+    }
+
     /* ── Accordion Preview ── */
     .post-preview {
       display: none;
@@ -712,6 +725,10 @@
             </div>
             <!-- Post list -->
             <div class="post-list hidden" id="post-list"></div>
+            <!-- Load more -->
+            <div class="load-more-wrap hidden" id="load-more-wrap">
+              <button class="btn btn-secondary" id="btn-load-more" onclick="loadMorePosts()">더보기</button>
+            </div>
           </div>
         </div>
       </div>
@@ -873,6 +890,8 @@
   let tokenClient    = null;
   let currentPostId  = null;   // 현재 편집 중인 postId
   let currentBlogId  = null;   // 현재 선택된 blogId
+  let currentNextPageToken = null; // 페이지네이션 토큰
+  let isLoadingMore  = false;  // 더보기 로드 중 여부
 
   // ── Init ──────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
@@ -1024,17 +1043,26 @@
     document.getElementById('post-list').classList.add('hidden');
   }
 
-  function renderPostListItems(posts) {
+  function updateLoadMoreButton() {
+    document.getElementById('load-more-wrap').classList.toggle('hidden', !currentNextPageToken);
+  }
+
+  function renderPostListItems(posts, append = false) {
     document.getElementById('post-list-auth-notice').classList.add('hidden');
     document.getElementById('post-list-loading').classList.add('hidden');
 
     const listEl = document.getElementById('post-list');
     listEl.classList.remove('hidden');
-    listEl.innerHTML = '';
-    accordionOpenPostId = null;
+
+    if (!append) {
+      listEl.innerHTML = '';
+      accordionOpenPostId = null;
+    }
 
     if (!posts || posts.length === 0) {
-      listEl.innerHTML = '<div class="post-list-empty">글이 없습니다.</div>';
+      if (!append) {
+        listEl.innerHTML = '<div class="post-list-empty">글이 없습니다.</div>';
+      }
       return;
     }
 
@@ -1072,6 +1100,10 @@
     const blogId = currentBlogId;
     if (!blogId) { showToast('blogId가 없습니다.', true); return; }
 
+    // 페이지네이션 상태 초기화
+    currentNextPageToken = null;
+    updateLoadMoreButton();
+
     renderPostListLoading();
 
     try {
@@ -1094,13 +1126,56 @@
       }
 
       const data = await res.json();
+      currentNextPageToken = data.nextPageToken || null;
       renderPostListItems(data.items || []);
+      updateLoadMoreButton();
     } catch (err) {
       document.getElementById('post-list-loading').classList.add('hidden');
       document.getElementById('post-list').classList.remove('hidden');
       document.getElementById('post-list').innerHTML =
         `<div class="post-list-empty">글 목록 로드 실패:<br/>${escapeHtml(err.message)}</div>`;
       showToast('글 목록 로드 실패: ' + err.message, true);
+    }
+  }
+
+  async function loadMorePosts() {
+    if (!accessToken || !currentNextPageToken || isLoadingMore) return;
+
+    const blogId = currentBlogId;
+    isLoadingMore = true;
+    const btn = document.getElementById('btn-load-more');
+    btn.disabled = true;
+    btn.textContent = '로드 중...';
+
+    try {
+      const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?maxResults=15&pageToken=${encodeURIComponent(currentNextPageToken)}`;
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (res.status === 401) {
+        accessToken = null;
+        updateAuthUI(false);
+        renderPostListAuth();
+        showToast('인증이 만료되었습니다. 다시 로그인하세요.', true);
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      currentNextPageToken = data.nextPageToken || null;
+      renderPostListItems(data.items || [], true);
+      updateLoadMoreButton();
+    } catch (err) {
+      showToast('더보기 로드 실패: ' + err.message, true);
+    } finally {
+      isLoadingMore = false;
+      btn.disabled = false;
+      btn.textContent = '더보기';
     }
   }
 
