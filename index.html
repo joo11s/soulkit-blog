@@ -878,32 +878,65 @@
   document.addEventListener('DOMContentLoaded', () => {
     applyMall('소울스토어');
     updateAuthUI();
+    // GIS 스크립트 로드 후 자동 로그인 시도
+    initGoogleTokenClient();
   });
+
+  // ── Google Token Client 초기화 & 자동 로그인 시도 ──────
+  function initGoogleTokenClient() {
+    // GIS 스크립트가 아직 로드되지 않았으면 100ms 후 재시도
+    if (typeof google === 'undefined' || !google.accounts) {
+      setTimeout(initGoogleTokenClient, 100);
+      return;
+    }
+
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/blogger',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) {
+          // 자동 로그인 실패 시 조용히 무시 (로그인 버튼 표시 유지)
+          if (tokenResponse.error !== 'user_logged_out' &&
+              tokenResponse.error !== 'access_denied' &&
+              tokenResponse.error !== 'immediate_failed') {
+            console.warn('[SoulKit] Google token error:', tokenResponse.error);
+          }
+          return;
+        }
+        accessToken = tokenResponse.access_token;
+        updateAuthUI(true);
+        showToast('✅ Google 로그인 성공');
+        loadPostList();
+      },
+      error_callback: (err) => {
+        // 팝업 없이 실패하는 경우 (prior consent 없음 등) — 조용히 무시
+        console.info('[SoulKit] Silent token refresh skipped:', err?.type || err);
+      },
+    });
+
+    // 페이지 로드 시 사일런트 토큰 갱신 시도 (prompt: '' = non-interactive)
+    try {
+      tokenClient.requestAccessToken({ prompt: '' });
+    } catch (e) {
+      // 실패해도 UI에 영향 없음
+      console.info('[SoulKit] Silent token request failed silently:', e);
+    }
+  }
 
   // ── Google OAuth ───────────────────────────────────────
   function googleLogin() {
     if (!tokenClient) {
-      // GIS 스크립트가 아직 로드 중이면 잠시 후 재시도
+      // 아직 초기화되지 않았으면 GIS 로드 대기 후 재시도
       if (typeof google === 'undefined' || !google.accounts) {
         showToast('Google Identity Services 로딩 중입니다. 잠시 후 다시 시도하세요.', true);
         return;
       }
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/blogger',
-        callback: (tokenResponse) => {
-          if (tokenResponse.error) {
-            showToast('Google 로그인 실패: ' + tokenResponse.error, true);
-            return;
-          }
-          accessToken = tokenResponse.access_token;
-          updateAuthUI(true);
-          showToast('✅ Google 로그인 성공');
-          loadPostList();
-        },
-      });
+      initGoogleTokenClient();
+      // initGoogleTokenClient가 자동으로 silent 시도함, 버튼 클릭 시엔 별도로 popup 요청
+      setTimeout(() => tokenClient && tokenClient.requestAccessToken({ prompt: 'select_account' }), 200);
+      return;
     }
-    tokenClient.requestAccessToken();
+    tokenClient.requestAccessToken({ prompt: 'select_account' });
   }
 
   function googleSignOut() {
