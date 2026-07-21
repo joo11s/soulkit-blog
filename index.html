@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SoulKit Blog Manager</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-dark:      #0f0f0f;
+      --bg-panel:     #1a1a1a;
+      --bg-card:      #222222;
+      --bg-input:     #2a2a2a;
+      --accent:       #f5e6c8;
+      --accent-dim:   #c4b49a;
+      --accent-hover: #ffe8b0;
+      --border:       #333333;
+      --border-light: #444444;
+      --text-primary: #e8e0d5;
+      --text-muted:   #888888;
+      --danger:       #e74c3c;
+      --success:      #27ae60;
+      --tab-active-bg: #2a2520;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      font-size: 14px;
+    }
+
+    /* ── Layout Wrapper ── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .header .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .header .logo span {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 13px;
+      margin-left: 6px;
+    }
+
+    /* ── Smartstore Bar ── */
+    .smartstore-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .smartstore-bar label {
+      color: var(--accent-dim);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .smartstore-bar input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      color: var(--text-primary);
+      padding: 7px 12px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s;
+      min-width: 0;
+    }
+
+    .smartstore-bar input:focus {
+      border-color: var(--accent);
+    }
+
+    .smartstore-bar input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #1a1200;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, transform .1s;
+    }
+
+    .btn:hover  { background: var(--accent-hover); }
+    .btn:active { transform: scale(.97); }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--accent);
+      border: 1px solid var(--border-light);
+    }
+
+    .btn-secondary:hover {
+      background: var(--tab-active-bg);
+      border-color: var(--accent-dim);
+    }
+
+    .btn-naver {
+      background: #03c75a;
+      color: #fff;
+      border: none;
+    }
+
+    .btn-naver:hover { background: #02a84a; }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .btn-danger:hover { background: rgba(231,76,60,.12); }
+
+    /* ── Tabs ── */
+    .tabs-row {
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+
+    .tab:hover { color: var(--text-primary); }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* ── J12 Blog Toggle ── */
+    .blog-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      padding: 6px 0;
+    }
+
+    .blog-toggle label {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .toggle-switch {
+      display: flex;
+      background: var(--bg-input);
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .toggle-option {
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: background .15s, color .15s;
+    }
+
+    .toggle-option.selected {
+      background: var(--accent);
+      color: #1a1200;
+    }
+
+    /* ── Main Content ── */
+    .main {
+      flex: 1;
+      overflow: hidden;
+      padding: 16px 20px;
+    }
+
+    .panel-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr 320px;
+      gap: 12px;
+      height: 100%;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-dim);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      flex: 1;
+    }
+
+    .panel-badge {
+      font-size: 10px;
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Blogger iframe panel ── */
+    .blogger-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .iframe-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .iframe-overlay .blog-url {
+      font-size: 11px;
+      color: var(--text-muted);
+      word-break: break-all;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    /* ── Editor panel ── */
+    .editor-wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .mock-post-info {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .mock-post-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .mock-post-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    textarea.html-editor {
+      flex: 1;
+      background: var(--bg-input);
+      color: #c9d1d9;
+      border: none;
+      padding: 14px;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      resize: none;
+      outline: none;
+      overflow-y: auto;
+    }
+
+    textarea.html-editor::selection {
+      background: rgba(245, 230, 200, .25);
+    }
+
+    .editor-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .editor-footer .status {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ── Right panel ── */
+    .right-panel-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 24px 16px;
+      height: 100%;
+    }
+
+    .naver-icon {
+      width: 56px;
+      height: 56px;
+      background: #03c75a;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -1px;
+    }
+
+    .naver-desc {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .naver-blog-id {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-dim);
+      text-align: center;
+    }
+
+    .btn-naver-big {
+      width: 100%;
+      padding: 13px;
+      font-size: 14px;
+      border-radius: 8px;
+    }
+
+    .naver-divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .naver-tips {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .naver-tips p {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .naver-tips strong {
+      color: var(--accent-dim);
+    }
+
+    /* ── Status toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.error {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border-light);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header: Logo + Smartstore Bar ── -->
+  <header class="header">
+    <div class="logo">SoulKit <span>Blog Manager</span></div>
+
+    <div class="smartstore-bar">
+      <label>스마트스토어 URL</label>
+      <input
+        id="ss-url-input"
+        type="url"
+        placeholder="https://smartstore.naver.com/..."
+      />
+      <button class="btn" onclick="handleStartWork()">▶ 작업 시작</button>
+    </div>
+  </header>
+
+  <!-- ── Business Tabs ── -->
+  <nav class="tabs-row" id="tabs-row">
+    <div class="tab active" data-mall="소울스토어" onclick="switchTab(this)">소울스토어</div>
+    <div class="tab"        data-mall="제이원투몰"  onclick="switchTab(this)">제이원투몰</div>
+    <div class="tab"        data-mall="행복산업"    onclick="switchTab(this)">행복산업</div>
+
+    <!-- J12 내부 토글 (제이원투몰 탭 선택 시만 표시) -->
+    <div class="blog-toggle hidden" id="j12-toggle">
+      <label>블로그 선택:</label>
+      <div class="toggle-switch">
+        <div class="toggle-option selected" data-blog="제이원매거진" onclick="switchJ12Blog(this)">제이원매거진</div>
+        <div class="toggle-option"          data-blog="개인AILAB"    onclick="switchJ12Blog(this)">개인AILAB</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main 3-Panel Layout ── -->
+  <main class="main">
+    <div class="panel-container">
+
+      <!-- ── LEFT: Blogger iframe ── -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">구글 블로그 (최신 발행글)</span>
+          <span class="panel-badge" id="blogger-badge">Blogger</span>
+          <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="loadBloggerPost()">새로고침</button>
+        </div>
+        <div class="panel-body" id="blogger-panel-body">
+          <!-- iframe will be injected here -->
+          <div class="iframe-overlay" id="blogger-placeholder">
+            <div class="spinner"></div>
+            <span>블로그 로딩 중...</span>
+            <span class="blog-url" id="blogger-url-display"></span>
+          </div>
+          <!-- NOTE: 실제 최신 글 불러오기는 추후 n8n 엔드포인트 연결 예정.
+               현재는 iframe으로 블로그 메인 페이지를 표시합니다.
+               일부 Blogger 사이트는 X-Frame-Options 정책으로 iframe 차단될 수 있음. -->
+          <iframe
+            id="blogger-iframe"
+            class="blogger-iframe hidden"
+            title="Blogger Preview"
+            sandbox="allow-same-origin allow-scripts allow-popups"
+          ></iframe>
+        </div>
+      </div>
+
+      <!-- ── CENTER: HTML Editor ── -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">본문 HTML 편집</span>
+          <span class="panel-badge">Editor</span>
+        </div>
+
+        <div class="panel-body">
+          <div class="editor-wrap">
+
+            <!-- Mock post info — 실제 글 데이터는 추후 Blogger API / n8n 연동 예정 -->
+            <div class="mock-post-info">
+              <div class="mock-post-title" id="editor-post-title">
+                [샘플] 신상품 소개 — 00월 00일 발행
+              </div>
+              <div class="mock-post-meta" id="editor-post-meta">
+                ※ 왼쪽 패널에서 글을 선택하면 본문이 로드됩니다 (추후 연동 예정)
+              </div>
+            </div>
+
+            <!-- NOTE: 최신 글 불러오기(Blogger → Editor) 기능은
+                 추후 POST /webhook/get-blogger-post (n8n) 연동 예정.
+                 현재는 mock HTML로 자리를 잡아둡니다. -->
+            <textarea
+              id="html-editor"
+              class="html-editor"
+              spellcheck="false"
+              placeholder="블로그 본문 HTML이 여기 로드됩니다..."
+            ></textarea>
+
+            <div class="editor-footer">
+              <span class="status" id="editor-status">준비됨</span>
+              <button class="btn btn-secondary" onclick="formatHtml()">정렬</button>
+              <!-- NOTE: 저장(재발행) 기능은 추후 POST /webhook/republish-blogger-post (n8n) 연동 예정 -->
+              <button class="btn" onclick="handleSavePost()">💾 저장 (재발행)</button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RIGHT: Naver Blog ── -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">네이버 블로그</span>
+          <span class="panel-badge">Naver</span>
+        </div>
+        <div class="panel-body">
+          <div class="right-panel-body" id="naver-panel-body">
+            <div class="naver-icon">N</div>
+            <div class="naver-blog-id" id="naver-blog-id-display">blog.naver.com/soulstore</div>
+            <div class="naver-desc" id="naver-desc">
+              네이버 블로그 글쓰기 페이지를<br/>새 탭으로 엽니다.
+            </div>
+
+            <div class="naver-divider"></div>
+
+            <button class="btn btn-naver btn-naver-big" onclick="openNaverWrite()">
+              ✍️ 네이버 블로그 글쓰기 열기
+            </button>
+
+            <div class="naver-tips">
+              <p>
+                <strong>사용법</strong><br/>
+                1. 위 버튼으로 네이버 글쓰기 새 탭 오픈<br/>
+                2. 가운데 편집창 HTML을 복사하여 붙여넣기<br/>
+                3. 네이버에서 발행
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  /* ========================================================
+     SoulKit Blog Manager — Client Script
+     ======================================================== */
+
+  // ── 사업자 설정 ──────────────────────────────────────────
+  const BUSINESSES = {
+    '소울스토어': {
+      blogger: {
+        label: '소울스토리',
+        url:   'https://soulstory3.blogspot.com',
+      },
+      naver: {
+        blogId: 'soulstore',          // TODO: 실제 네이버 아이디로 교체
+        label:  '소울스토어 네이버 블로그',
+      },
+    },
+    '제이원투몰': {
+      // 내부 토글로 두 블로그 선택
+      blogs: {
+        '제이원매거진': {
+          blogger: {
+            label: '제이원매거진',
+            url:   'https://jonemagazine.blogspot.com',
+          },
+          naver: {
+            blogId: 'jonemagazine',   // TODO: 실제 네이버 아이디로 교체
+            label:  '제이원매거진 네이버 블로그',
+          },
+        },
+        '개인AILAB': {
+          blogger: {
+            label: '개인AILAB',
+            url:   'https://wonflowai.blogspot.com',
+          },
+          naver: {
+            blogId: 'wonflowai',      // TODO: 실제 네이버 아이디로 교체
+            label:  '개인AILAB 네이버 블로그',
+          },
+        },
+      },
+    },
+    '행복산업': {
+      blogger: {
+        label: '행복라이프',
+        url:   'https://happybizlife.blogspot.com',
+      },
+      naver: {
+        blogId: 'happybizlife',       // TODO: 실제 네이버 아이디로 교체
+        label:  '행복산업 네이버 블로그',
+      },
+    },
+  };
+
+  // n8n webhook endpoint
+  const WEBHOOK_URL = 'https://n8n.wonflowai.com/webhook/happyj1-blog-register';
+
+  // ── State ──────────────────────────────────────────────
+  let currentMall   = '소울스토어';
+  let currentJ12Blog = '제이원매거진';
+
+  // ── Init ──────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    applyMall('소울스토어');
+    loadMockEditorContent();
+  });
+
+  // ── Tab switching ──────────────────────────────────────
+  function switchTab(el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    currentMall = el.dataset.mall;
+
+    const toggle = document.getElementById('j12-toggle');
+    toggle.classList.toggle('hidden', currentMall !== '제이원투몰');
+
+    applyMall(currentMall);
+  }
+
+  function switchJ12Blog(el) {
+    document.querySelectorAll('.toggle-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    currentJ12Blog = el.dataset.blog;
+    applyMall('제이원투몰');
+  }
+
+  // ── Apply mall configuration ───────────────────────────
+  function applyMall(mall) {
+    const cfg = getBloggerConfig();
+    renderBloggerPanel(cfg.blogger);
+    renderNaverPanel(cfg.naver);
+    loadMockEditorContent();
+  }
+
+  function getBloggerConfig() {
+    if (currentMall === '제이원투몰') {
+      return BUSINESSES['제이원투몰'].blogs[currentJ12Blog];
+    }
+    return BUSINESSES[currentMall];
+  }
+
+  // ── Blogger panel ──────────────────────────────────────
+  function renderBloggerPanel(cfg) {
+    const badge   = document.getElementById('blogger-badge');
+    const urlDisp = document.getElementById('blogger-url-display');
+    badge.textContent     = cfg.label;
+    urlDisp.textContent   = cfg.url;
+
+    loadBloggerPost(cfg.url);
+  }
+
+  function loadBloggerPost(overrideUrl) {
+    const cfg = getBloggerConfig();
+    const url = overrideUrl || cfg.blogger.url;
+
+    const placeholder = document.getElementById('blogger-placeholder');
+    const iframe      = document.getElementById('blogger-iframe');
+
+    placeholder.classList.remove('hidden');
+    iframe.classList.add('hidden');
+
+    // NOTE: 추후 n8n GET /webhook/get-latest-blogger-post 연동 시 실제 글 데이터로 대체.
+    // 현재는 iframe으로 블로그 메인 페이지 표시.
+    // Blogger의 X-Frame-Options 정책에 따라 일부 블로그는 iframe 표시가 차단될 수 있습니다.
+    iframe.src = '';
+    setTimeout(() => {
+      iframe.src = url;
+      iframe.onload = () => {
+        placeholder.classList.add('hidden');
+        iframe.classList.remove('hidden');
+      };
+      iframe.onerror = () => {
+        document.getElementById('blogger-url-display').textContent =
+          '⚠ iframe 차단됨. 아래 URL을 직접 열어주세요: ' + url;
+      };
+    }, 300);
+  }
+
+  // ── Naver panel ────────────────────────────────────────
+  function renderNaverPanel(cfg) {
+    document.getElementById('naver-blog-id-display').textContent =
+      `blog.naver.com/${cfg.blogId}`;
+    document.getElementById('naver-desc').innerHTML =
+      `<strong>${cfg.label}</strong><br/>네이버 블로그 글쓰기 페이지를<br/>새 탭으로 엽니다.`;
+  }
+
+  function openNaverWrite() {
+    const cfg = getBloggerConfig();
+    const blogId = cfg.naver.blogId;
+    const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${blogId}`;
+    window.open(writeUrl, '_blank', 'noopener,noreferrer');
+    showToast(`네이버 블로그 글쓰기 열기: ${blogId}`);
+  }
+
+  // ── HTML Editor (mock) ────────────────────────────────
+  // NOTE: 실제 최신 글 본문 불러오기는 추후 n8n 엔드포인트 연동 예정
+  const MOCK_HTML = `<h2>샘플 블로그 포스트 제목</h2>
+<p>이 영역은 구글 블로그(Blogger)의 최신 발행글 본문이 자동으로 로드되는 자리입니다.</p>
+<p><strong>주요 특징</strong></p>
+<ul>
+  <li>고품질 소재 사용</li>
+  <li>합리적인 가격</li>
+  <li>빠른 배송</li>
+</ul>
+<p>지금 바로 스마트스토어에서 확인해 보세요!</p>`;
+
+  function loadMockEditorContent() {
+    const editor = document.getElementById('html-editor');
+    if (!editor.value || editor.dataset.isMock === 'true') {
+      editor.value = MOCK_HTML;
+      editor.dataset.isMock = 'true';
+    }
+    setEditorStatus('준비됨 (샘플 데이터)');
+  }
+
+  function setEditorStatus(msg) {
+    document.getElementById('editor-status').textContent = msg;
+  }
+
+  function formatHtml() {
+    const el = document.getElementById('html-editor');
+    try {
+      // Simple indent-based formatter (no external dep)
+      let html = el.value;
+      let indent = 0;
+      html = html
+        .replace(/></g, '>\n<')
+        .split('\n')
+        .map(line => {
+          line = line.trim();
+          if (!line) return '';
+          if (/^<\//.test(line)) indent = Math.max(0, indent - 1);
+          const out = '  '.repeat(indent) + line;
+          if (/^<[^/!]/.test(line) && !/\/>$/.test(line) && !/<(br|img|input|hr|meta|link)/i.test(line)) indent++;
+          return out;
+        })
+        .filter(Boolean)
+        .join('\n');
+      el.value = html;
+      showToast('HTML 정렬 완료');
+    } catch (e) {
+      showToast('정렬 실패: ' + e.message, true);
+    }
+  }
+
+  // NOTE: 저장(재발행) 기능은 추후 POST /webhook/republish-blogger-post (n8n) 연동 예정.
+  // 현재는 UI 자리만 잡아둡니다.
+  function handleSavePost() {
+    const html = document.getElementById('html-editor').value;
+    if (!html.trim()) { showToast('본문 내용이 없습니다.', true); return; }
+
+    setEditorStatus('저장 중...');
+    // TODO: 실제 n8n 엔드포인트 연동 시 아래 fetch 주석 해제
+    // fetch('https://n8n.wonflowai.com/webhook/republish-blogger-post', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ mall: currentMall, html }),
+    // })
+    setTimeout(() => {
+      setEditorStatus('✅ 저장됨 (mock — 실제 재발행 미연결)');
+      showToast('저장 완료 (mock)');
+    }, 800);
+  }
+
+  // ── Smartstore → n8n webhook ──────────────────────────
+  async function handleStartWork() {
+    const urlInput = document.getElementById('ss-url-input');
+    const rawUrl   = urlInput.value.trim();
+
+    if (!rawUrl) {
+      showToast('스마트스토어 URL을 입력해주세요.', true);
+      urlInput.focus();
+      return;
+    }
+
+    // Extract itemNo from URL (e.g., /products/12345678)
+    const itemNoMatch = rawUrl.match(/\/products\/(\d+)/);
+    const itemNo = itemNoMatch ? itemNoMatch[1] : '';
+
+    const payload = {
+      itemNo,
+      mall:           currentMall,
+      product_name:   '',   // n8n이 URL에서 자동 추출 예정
+      keywords:       '',   // n8n이 자동 생성 예정
+      smartstore_url: rawUrl,
+    };
+
+    showToast('작업 요청 전송 중...');
+
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json().catch(() => ({}));
+      showToast(`✅ 작업 시작됨 (${currentMall}) — itemNo: ${itemNo || 'N/A'}`);
+      console.log('[SoulKit] webhook response:', data);
+    } catch (err) {
+      showToast(`❌ 전송 실패: ${err.message}`, true);
+      console.error('[SoulKit] webhook error:', err);
+    }
+  }
+
+  // ── Toast helper ──────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, isError = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.toggle('error', isError);
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>
