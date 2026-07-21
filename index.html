@@ -705,7 +705,7 @@
       </div>
 
       <!-- ── RIGHT: Naver Blog ── -->
-      <div class="panel">
+      <div class="panel" id="naver-panel">
         <div class="panel-header">
           <span class="panel-title">네이버 블로그</span>
           <span class="panel-badge">Naver</span>
@@ -715,7 +715,7 @@
             <div class="naver-icon">N</div>
             <div class="naver-blog-id" id="naver-blog-id-display">blog.naver.com/soulstore</div>
             <div class="naver-desc" id="naver-desc">
-              네이버 블로그 글쓰기 페이지를<br/>새 탭으로 엽니다.
+              네이버 블로그 글쓰기 페이지를<br/>모바일 팝업으로 엽니다.
             </div>
 
             <div class="naver-divider"></div>
@@ -727,7 +727,7 @@
             <div class="naver-tips">
               <p>
                 <strong>사용법</strong><br/>
-                1. 위 버튼으로 네이버 글쓰기 새 탭 오픈<br/>
+                1. 위 버튼으로 네이버 글쓰기 팝업 오픈<br/>
                 2. 가운데 편집창 HTML을 복사하여 붙여넣기<br/>
                 3. 네이버에서 발행
               </p>
@@ -1063,14 +1063,36 @@
     document.getElementById('naver-blog-id-display').textContent =
       `blog.naver.com/${cfg.blogId}`;
     document.getElementById('naver-desc').innerHTML =
-      `<strong>${cfg.label}</strong><br/>네이버 블로그 글쓰기 페이지를<br/>새 탭으로 엽니다.`;
+      `<strong>${cfg.label}</strong><br/>네이버 블로그 글쓰기 페이지를<br/>모바일 팝업으로 엽니다.`;
   }
 
   function openNaverWrite() {
     const cfg = getBloggerConfig();
     const blogId = cfg.naver.blogId;
-    const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${blogId}`;
-    window.open(writeUrl, '_blank', 'noopener,noreferrer');
+    const writeUrl = `https://m.blog.naver.com/PostWriteForm.naver?blogId=${blogId}`;
+
+    const popupW = 420;
+    const popupH = 850;
+
+    // 오른쪽 네이버 패널의 화면상 실제 좌표 계산 (screenX/Y 보정 포함)
+    const panelEl = document.getElementById('naver-panel');
+    const rect = panelEl ? panelEl.getBoundingClientRect() : { left: 0, top: 0 };
+    const screenLeft = window.screenX !== undefined ? window.screenX : (window.screenLeft || 0);
+    const screenTop  = window.screenY !== undefined ? window.screenY : (window.screenTop  || 0);
+    const chromeBarH = window.outerHeight - window.innerHeight;
+    const left = Math.round(screenLeft + rect.left);
+    const top  = Math.round(screenTop  + chromeBarH + rect.top);
+
+    const features = `width=${popupW},height=${popupH},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+
+    const popup = window.open(writeUrl, 'naverBlogPopup', features);
+
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      alert('팝업이 차단되었습니다. 브라우저 팝업 허용 설정을 확인해주세요.');
+      return;
+    }
+
+    popup.focus();
     showToast(`네이버 블로그 글쓰기 열기: ${blogId}`);
   }
 
