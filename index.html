@@ -410,6 +410,54 @@
       font-size: 12px;
     }
 
+    /* ── Accordion Preview ── */
+    .post-preview {
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-light);
+      border-bottom: 2px solid var(--accent);
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .post-preview.open {
+      display: block;
+    }
+
+    .post-preview img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    .post-preview a {
+      color: var(--accent);
+    }
+
+    .post-list-item .post-item-title-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .post-list-item .post-item-title-row .accordion-arrow {
+      flex-shrink: 0;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      transition: transform .2s;
+      user-select: none;
+    }
+
+    .post-list-item.accordion-open .accordion-arrow {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+
     /* ── Editor panel ── */
     .editor-wrap {
       display: flex;
@@ -950,6 +998,7 @@
     const listEl = document.getElementById('post-list');
     listEl.classList.remove('hidden');
     listEl.innerHTML = '';
+    accordionOpenPostId = null;
 
     if (!posts || posts.length === 0) {
       listEl.innerHTML = '<div class="post-list-empty">글이 없습니다.</div>';
@@ -966,12 +1015,21 @@
         : '';
 
       item.innerHTML = `
-        <div class="post-item-title">${escapeHtml(post.title)}</div>
+        <div class="post-item-title-row">
+          <span class="accordion-arrow">▶</span>
+          <div class="post-item-title">${escapeHtml(post.title)}</div>
+        </div>
         <div class="post-item-date">${published}</div>
       `;
 
-      item.addEventListener('click', () => selectPost(post.id, item));
+      // Accordion preview element inserted after item
+      const preview = document.createElement('div');
+      preview.className = 'post-preview';
+      preview.dataset.postId = post.id;
+
+      item.addEventListener('click', () => selectPostWithAccordion(post, item, preview));
       listEl.appendChild(item);
+      listEl.appendChild(preview);
     });
   }
 
@@ -1013,7 +1071,40 @@
     }
   }
 
-  async function selectPost(postId, itemEl) {
+  // Track currently open accordion
+  let accordionOpenPostId = null;
+
+  async function selectPostWithAccordion(post, itemEl, previewEl) {
+    const postId = post.id;
+    const isSamePost = accordionOpenPostId === postId;
+
+    // Close any open accordion
+    document.querySelectorAll('.post-preview.open').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.post-list-item.accordion-open').forEach(el => el.classList.remove('accordion-open'));
+
+    if (isSamePost) {
+      // Toggle off — collapse
+      accordionOpenPostId = null;
+    } else {
+      // Open this accordion (show preview from post.content if available in list data,
+      // otherwise we load it from the API — selectPost will fetch it anyway)
+      accordionOpenPostId = postId;
+      itemEl.classList.add('accordion-open');
+
+      if (post.content) {
+        previewEl.innerHTML = post.content;
+        previewEl.classList.add('open');
+      } else {
+        previewEl.innerHTML = '<em style="color:var(--text-muted)">미리보기 로드 중...</em>';
+        previewEl.classList.add('open');
+      }
+    }
+
+    // Always load into editor (existing behavior)
+    selectPost(postId, itemEl, previewEl);
+  }
+
+  async function selectPost(postId, itemEl, previewEl) {
     // Highlight selected item
     document.querySelectorAll('.post-list-item').forEach(el => el.classList.remove('active'));
     itemEl.classList.add('active');
@@ -1051,10 +1142,18 @@
       editor.value = post.content || '';
       editor.dataset.isMock = 'false';
 
+      // Update accordion preview with full content (rendered HTML)
+      if (previewEl && accordionOpenPostId === postId) {
+        previewEl.innerHTML = post.content || '<em style="color:var(--text-muted)">내용 없음</em>';
+      }
+
       setEditorStatus('로드 완료');
     } catch (err) {
       setEditorStatus('로드 실패: ' + err.message);
       showToast('글 로드 실패: ' + err.message, true);
+      if (previewEl && accordionOpenPostId === postId) {
+        previewEl.innerHTML = `<em style="color:var(--danger)">로드 실패: ${escapeHtml(err.message)}</em>`;
+      }
     }
   }
 
