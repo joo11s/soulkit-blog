@@ -1068,6 +1068,8 @@
   let currentBlogId  = null;   // 현재 선택된 blogId
   let currentNextPageToken = null; // 페이지네이션 토큰
   let isLoadingMore  = false;  // 더보기 로드 중 여부
+  let allScheduleRows = [];    // schedule 시트 전체 원본 rows 캐시 (필터링용)
+  let scheduleFilterProductKey = null; // 현재 글 클릭으로 필터링된 product_key (null이면 블로그 전체 스케줄)
 
   // ── Init ──────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', () => {
@@ -1190,6 +1192,7 @@
   function applyMall(mall) {
     const cfg = getBloggerConfig();
     currentBlogId = cfg.blogger.blogId;
+    scheduleFilterProductKey = null; // 사업자/블로그 전환 시 글 필터 초기화
     const badge = document.getElementById('blogger-badge');
     badge.textContent = cfg.blogger.label;
     badge.href = cfg.blogger.url || '#';
@@ -1391,6 +1394,9 @@
       }
     }
 
+    // 오른쪽 발행 스케줄 패널: 클릭한 글에 연결된 상품 스케줄로 필터링
+    filterScheduleByPost(post);
+
     // Always load into editor (existing behavior)
     selectPost(postId, itemEl, previewEl);
   }
@@ -1520,15 +1526,70 @@
       // values[0] is header row
       // columns: A=schedule_id, B=product_key, C=blog_id, D=blog_name, E=planned_date, F=post_index, G=angle, H=status, I=task_id, J=post_url, K=published_at
       const rows = values.slice(1); // skip header
-      // Filter by currentBlogId (column C, index 2)
-      const filtered = rows
-        .map((row, i) => ({ row, rowNum: i + 2 })) // rowNum is 1-indexed, data starts at row 2
-        .filter(({ row }) => row[2] === currentBlogId)
-        .sort((a, b) => (a.row[4] || '').localeCompare(b.row[4] || '')); // sort by planned_date
-      renderSchedule(filtered);
+      allScheduleRows = rows.map((row, i) => ({ row, rowNum: i + 2 })); // 전체 원본 캐시 (rowNum은 1-indexed, data는 2행부터)
+      applyScheduleFilter();
     } catch(e) {
       console.error('Schedule load error', e);
       showToast('스케줄 로드 실패: ' + e.message, true);
+    }
+  }
+
+  // 현재 상태(scheduleFilterProductKey)에 따라 스케줄 목록을 다시 그림
+  // scheduleFilterProductKey: null = 글 미선택(블로그 전체 스케줄), 'NONE' = 선택한 글에 연결된 스케줄 없음, 그 외 = product_key로 필터링
+  function applyScheduleFilter() {
+    if (!currentBlogId) { renderSchedule([]); return; }
+
+    let items;
+    if (scheduleFilterProductKey && scheduleFilterProductKey !== 'NONE') {
+      items = allScheduleRows
+        .filter(({ row }) => row[2] === currentBlogId && row[1] === scheduleFilterProductKey)
+        .sort((a, b) => (parseInt(a.row[5], 10) || 0) - (parseInt(b.row[5], 10) || 0));
+    } else if (scheduleFilterProductKey === 'NONE') {
+      items = [];
+    } else {
+      items = allScheduleRows
+        .filter(({ row }) => row[2] === currentBlogId)
+        .sort((a, b) => (a.row[4] || '').localeCompare(b.row[4] || ''));
+    }
+    renderScheduleFilterBanner();
+    renderSchedule(items);
+  }
+
+  function filterScheduleByPost(post) {
+    if (!post || !post.url) { scheduleFilterProductKey = null; applyScheduleFilter(); return; }
+    const match = allScheduleRows.find(({ row }) =>
+      row[2] === currentBlogId && row[9] && normalizeUrl(row[9]) === normalizeUrl(post.url)
+    );
+    scheduleFilterProductKey = match ? match.row[1] : 'NONE';
+    applyScheduleFilter();
+  }
+
+  function normalizeUrl(u) {
+    return (u || '').trim().replace(/\/$/, '').replace(/^https?:\/\//, '');
+  }
+
+  function clearScheduleFilter() {
+    scheduleFilterProductKey = null;
+    applyScheduleFilter();
+  }
+
+  function renderScheduleFilterBanner() {
+    let banner = document.getElementById('schedule-filter-banner');
+    const scheduleList = document.getElementById('schedule-list');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'schedule-filter-banner';
+      banner.style.cssText = 'font-size:11px;color:var(--text-muted);padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;gap:8px;';
+      scheduleList.parentNode.insertBefore(banner, scheduleList);
+    }
+    if (scheduleFilterProductKey === 'NONE') {
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span>선택한 글에 연결된 발행 스케줄이 없습니다</span><button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;flex-shrink:0;" onclick="clearScheduleFilter()">전체 보기</button>`;
+    } else if (scheduleFilterProductKey) {
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span>선택한 글의 발행 스케줄 (상품: ${escapeHtml(scheduleFilterProductKey)})</span><button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;flex-shrink:0;" onclick="clearScheduleFilter()">전체 보기</button>`;
+    } else {
+      banner.style.display = 'none';
     }
   }
 
