@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SoulKit Blog Manager</title>
+  <title>Happy J1 Blog</title>
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -71,31 +71,48 @@
       margin-left: 6px;
     }
 
-    /* ── Smartstore Bar ── */
+    /* ── Smartstore Bar (사업자별 2행: 카페24 상품NO+전송 / 스마트스토어 URL) ── */
     .smartstore-bar {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       flex: 1;
+      padding: 6px 0;
     }
 
-    .smartstore-bar label {
+    .biz-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .biz-row1, .biz-row2 {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .biz-row1 label {
       color: var(--accent-dim);
-      font-size: 12px;
+      font-size: 11px;
       white-space: nowrap;
+      width: 56px;
+      flex-shrink: 0;
     }
 
     .smartstore-bar input {
       flex: 1;
+      min-width: 0;
       background: var(--bg-input);
       border: 1px solid var(--border-light);
       border-radius: 6px;
       color: var(--text-primary);
-      padding: 7px 12px;
-      font-size: 13px;
+      padding: 6px 10px;
+      font-size: 12px;
       outline: none;
       transition: border-color .2s;
-      min-width: 0;
     }
 
     .smartstore-bar input:focus {
@@ -104,6 +121,18 @@
 
     .smartstore-bar input::placeholder {
       color: var(--text-muted);
+    }
+
+    .btn-send-one {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .btn-send-all {
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .btn {
@@ -837,16 +866,40 @@
 
   <!-- ── Header: Logo + Smartstore Bar + Google Login ── -->
   <header class="header">
-    <div class="logo">SoulKit <span>Blog Manager</span></div>
+    <div class="logo">Happy J1 <span>Blog</span></div>
 
     <div class="smartstore-bar">
-      <label>스마트스토어 URL</label>
-      <input
-        id="ss-url-input"
-        type="url"
-        placeholder="https://smartstore.naver.com/..."
-      />
-      <button class="btn" onclick="handleStartWork()">▶ 작업 시작</button>
+      <div class="biz-col" data-mall="소울스토어">
+        <div class="biz-row1">
+          <label>소울스토어</label>
+          <input class="cafe24-no-input" data-mall="소울스토어" placeholder="카페24 상품NO" />
+          <button class="btn btn-secondary btn-send-one" onclick="handleSendOne('소울스토어')">전송</button>
+        </div>
+        <div class="biz-row2">
+          <input class="ss-url-input" data-mall="소울스토어" type="url" placeholder="스마트스토어 URL" />
+        </div>
+      </div>
+      <div class="biz-col" data-mall="제이원투몰">
+        <div class="biz-row1">
+          <label>제이원투몰</label>
+          <input class="cafe24-no-input" data-mall="제이원투몰" placeholder="카페24 상품NO" />
+          <button class="btn btn-secondary btn-send-one" onclick="handleSendOne('제이원투몰')">전송</button>
+        </div>
+        <div class="biz-row2">
+          <input class="ss-url-input" data-mall="제이원투몰" type="url" placeholder="스마트스토어 URL" />
+        </div>
+      </div>
+      <div class="biz-col" data-mall="행복산업">
+        <div class="biz-row1">
+          <label>행복산업</label>
+          <input class="cafe24-no-input" data-mall="행복산업" placeholder="카페24 상품NO" />
+          <button class="btn btn-secondary btn-send-one" onclick="handleSendOne('행복산업')">전송</button>
+        </div>
+        <div class="biz-row2">
+          <input class="ss-url-input" data-mall="행복산업" type="url" placeholder="스마트스토어 URL" />
+        </div>
+      </div>
+      <button class="btn btn-send-all" onclick="handleSendAll()">▶ 전체 전송</button>
     </div>
 
     <!-- Google Login / User Info (right side) -->
@@ -987,7 +1040,7 @@
 
 <script>
   /* ========================================================
-     SoulKit Blog Manager — Client Script
+     Happy J1 Blog — Client Script
      ======================================================== */
 
   // ── Google OAuth Client ID ─────────────────────────────
@@ -1770,29 +1823,34 @@
     }
   }
 
-  // ── Smartstore → n8n webhook ──────────────────────────
-  async function handleStartWork() {
-    const urlInput = document.getElementById('ss-url-input');
-    const rawUrl   = urlInput.value.trim();
+  // ── 카페24 상품NO 기반 사업자별 등록 → n8n webhook ─────────
+  // NOTE: 백엔드(HappyJ1-Blog n8n 워크플로우)는 아직 이 payload 형태(cafe24_product_no 기반
+  // 카페24 상품조회 + 상세이미지 비전분석)를 처리하도록 개조되지 않았음 — 프론트엔드 선작업.
+  function getBizInputs(mall) {
+    const noInput  = document.querySelector(`.cafe24-no-input[data-mall="${mall}"]`);
+    const urlInput = document.querySelector(`.ss-url-input[data-mall="${mall}"]`);
+    return {
+      noInput,
+      urlInput,
+      cafe24ProductNo: noInput ? noInput.value.trim() : '',
+      smartstoreUrl:   urlInput ? urlInput.value.trim() : '',
+    };
+  }
 
-    if (!rawUrl) {
-      showToast('스마트스토어 URL을 입력해주세요.', true);
-      urlInput.focus();
-      return;
+  async function sendMallRegister(mall) {
+    const { noInput, cafe24ProductNo, smartstoreUrl } = getBizInputs(mall);
+
+    if (!cafe24ProductNo) {
+      showToast(`${mall}: 카페24 상품NO를 입력해주세요.`, true);
+      if (noInput) noInput.focus();
+      return false;
     }
 
-    const itemNoMatch = rawUrl.match(/\/products\/(\d+)/);
-    const itemNo = itemNoMatch ? itemNoMatch[1] : '';
-
     const payload = {
-      itemNo,
-      mall:           currentMall,
-      product_name:   '',
-      keywords:       '',
-      smartstore_url: rawUrl,
+      mall,
+      cafe24_product_no: cafe24ProductNo,
+      smartstore_url:    smartstoreUrl,
     };
-
-    showToast('작업 요청 전송 중...');
 
     try {
       const res = await fetch(WEBHOOK_URL, {
@@ -1800,16 +1858,36 @@
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       const data = await res.json().catch(() => ({}));
-      showToast(`✅ 작업 시작됨 (${currentMall}) — itemNo: ${itemNo || 'N/A'}`);
-      console.log('[SoulKit] webhook response:', data);
+      console.log(`[HappyJ1] ${mall} webhook response:`, data);
+      return true;
     } catch (err) {
-      showToast(`❌ 전송 실패: ${err.message}`, true);
-      console.error('[SoulKit] webhook error:', err);
+      showToast(`❌ ${mall} 전송 실패: ${err.message}`, true);
+      console.error(`[HappyJ1] ${mall} webhook error:`, err);
+      return false;
     }
+  }
+
+  async function handleSendOne(mall) {
+    showToast(`${mall} 전송 중...`);
+    const ok = await sendMallRegister(mall);
+    if (ok) showToast(`✅ ${mall} 전송 완료 — 카페24 상품NO: ${getBizInputs(mall).cafe24ProductNo}`);
+  }
+
+  async function handleSendAll() {
+    const malls = ['소울스토어', '제이원투몰', '행복산업'];
+    const targets = malls.filter(m => getBizInputs(m).cafe24ProductNo);
+
+    if (targets.length === 0) {
+      showToast('전송할 사업자의 카페24 상품NO를 하나 이상 입력해주세요.', true);
+      return;
+    }
+
+    showToast(`전체 전송 중... (${targets.join(', ')})`);
+    const results = await Promise.all(targets.map(m => sendMallRegister(m)));
+    const successCount = results.filter(Boolean).length;
+    showToast(`✅ 전체 전송 완료 (${successCount}/${targets.length}건 성공)`);
   }
 
   // ── Image Download Helpers ────────────────────────────
