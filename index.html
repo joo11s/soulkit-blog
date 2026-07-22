@@ -1839,6 +1839,9 @@
   // ── 카페24 상품NO 기반 사업자별 등록 → n8n webhook ─────────
   // NOTE: 백엔드(HappyJ1-Blog n8n 워크플로우)는 아직 이 payload 형태(cafe24_product_no 기반
   // 카페24 상품조회 + 상세이미지 비전분석)를 처리하도록 개조되지 않았음 — 프론트엔드 선작업.
+  // 규칙: 카페24 상품NO를 3개 중 1개만 입력하면 "공통 상품"으로 간주해 나머지 2개 사업자에도
+  // 같은 상품NO를 복제해서 전송한다. 2개 이상 개별 입력하면 각자 다른 상품으로 취급한다.
+  // 스마트스토어 URL은 전송 대상 사업자 전원 필수.
   function getBizInputs(mall) {
     const noInput  = document.querySelector(`.cafe24-no-input[data-mall="${mall}"]`);
     const urlInput = document.querySelector(`.ss-url-input[data-mall="${mall}"]`);
@@ -1850,12 +1853,12 @@
     };
   }
 
-  async function sendMallRegister(mall) {
-    const { noInput, cafe24ProductNo, smartstoreUrl } = getBizInputs(mall);
+  async function sendMallRegister(mall, cafe24ProductNo, sharedProduct) {
+    const { urlInput, smartstoreUrl } = getBizInputs(mall);
 
-    if (!cafe24ProductNo) {
-      showToast(`${mall}: 카페24 상품NO를 입력해주세요.`, true);
-      if (noInput) noInput.focus();
+    if (!smartstoreUrl) {
+      showToast(`${mall}: 스마트스토어 URL을 입력해주세요.`, true);
+      if (urlInput) urlInput.focus();
       return false;
     }
 
@@ -1863,6 +1866,7 @@
       mall,
       cafe24_product_no: cafe24ProductNo,
       smartstore_url:    smartstoreUrl,
+      shared_product:    !!sharedProduct,
     };
 
     try {
@@ -1883,22 +1887,52 @@
   }
 
   async function handleSendOne(mall) {
+    const { noInput, cafe24ProductNo } = getBizInputs(mall);
+    if (!cafe24ProductNo) {
+      showToast(`${mall}: 카페24 상품NO를 입력해주세요.`, true);
+      if (noInput) noInput.focus();
+      return;
+    }
     showToast(`${mall} 전송 중...`);
-    const ok = await sendMallRegister(mall);
-    if (ok) showToast(`✅ ${mall} 전송 완료 — 카페24 상품NO: ${getBizInputs(mall).cafe24ProductNo}`);
+    const ok = await sendMallRegister(mall, cafe24ProductNo, false);
+    if (ok) showToast(`✅ ${mall} 전송 완료 — 카페24 상품NO: ${cafe24ProductNo}`);
   }
 
   async function handleSendAll() {
     const malls = ['소울스토어', '제이원투몰', '행복산업'];
-    const targets = malls.filter(m => getBizInputs(m).cafe24ProductNo);
+    const inputs = malls.map(mall => ({ mall, ...getBizInputs(mall) }));
+    const filled = inputs.filter(i => i.cafe24ProductNo);
 
-    if (targets.length === 0) {
+    if (filled.length === 0) {
       showToast('전송할 사업자의 카페24 상품NO를 하나 이상 입력해주세요.', true);
       return;
     }
 
-    showToast(`전체 전송 중... (${targets.join(', ')})`);
-    const results = await Promise.all(targets.map(m => sendMallRegister(m)));
+    let targets;
+    let sharedMode = false;
+
+    if (filled.length === 1) {
+      // 공통 모드: 상품NO 1개만 입력됨 → 3사업자 전부 같은 상품NO로 복제 전송
+      sharedMode = true;
+      const commonNo = filled[0].cafe24ProductNo;
+      targets = malls.map(mall => ({ mall, cafe24ProductNo: commonNo }));
+    } else {
+      // 개별 모드: 상품NO를 입력한 사업자만 각자 값으로 전송
+      targets = filled.map(i => ({ mall: i.mall, cafe24ProductNo: i.cafe24ProductNo }));
+    }
+
+    const missingUrl = targets.filter(t => !getBizInputs(t.mall).smartstoreUrl);
+    if (missingUrl.length > 0) {
+      showToast(`${missingUrl.map(t => t.mall).join(', ')}: 스마트스토어 URL을 입력해주세요.`, true);
+      getBizInputs(missingUrl[0].mall).urlInput?.focus();
+      return;
+    }
+
+    showToast(sharedMode
+      ? `공통 상품으로 3사업자 전체 전송 중... (카페24 상품NO: ${targets[0].cafe24ProductNo})`
+      : `전체 전송 중... (${targets.map(t => t.mall).join(', ')})`);
+
+    const results = await Promise.all(targets.map(t => sendMallRegister(t.mall, t.cafe24ProductNo, sharedMode)));
     const successCount = results.filter(Boolean).length;
     showToast(`✅ 전체 전송 완료 (${successCount}/${targets.length}건 성공)`);
   }
