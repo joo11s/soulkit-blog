@@ -723,6 +723,113 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .hidden { display: none !important; }
+
+    /* ── Schedule Panel ── */
+    #schedule-panel .panel-body {
+      overflow: hidden;
+      position: relative;
+    }
+
+    .schedule-list {
+      overflow-y: auto;
+      height: 100%;
+      padding: 8px;
+    }
+
+    .schedule-item {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .schedule-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 4px;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+
+    .schedule-row.clickable {
+      cursor: pointer;
+    }
+
+    .schedule-row.clickable:hover {
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+    }
+
+    .badge-done {
+      background: #22c55e;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .badge-pending {
+      background: #9ca3af;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .post-index {
+      color: var(--accent-dim);
+      font-weight: 600;
+      white-space: nowrap;
+      min-width: 52px;
+    }
+
+    .planned-date {
+      color: var(--text-muted);
+      font-size: 11px;
+      white-space: nowrap;
+      min-width: 70px;
+    }
+
+    .angle-text {
+      flex: 1;
+      color: var(--text-primary);
+      line-height: 1.4;
+    }
+
+    .editable {
+      cursor: pointer;
+      text-decoration: underline dotted;
+    }
+
+    .angle-input {
+      flex: 1;
+      border: 1px solid var(--border-light);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .angle-input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-save-angle {
+      padding: 3px 10px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .btn-save-angle:hover {
+      background: #2563eb;
+    }
   </style>
 </head>
 <body>
@@ -776,6 +883,9 @@
         <div class="toggle-option"          data-blog="개인AILAB"    onclick="switchJ12Blog(this)">개인AILAB</div>
       </div>
     </div>
+
+    <!-- 네이버 글쓰기 버튼 -->
+    <button class="btn btn-naver" style="margin-left:8px;padding:5px 12px;font-size:12px;" onclick="openNaverWrite()">🍀 네이버 글쓰기</button>
   </nav>
 
   <!-- ── Main 3-Panel Layout ── -->
@@ -848,35 +958,22 @@
         </div>
       </div>
 
-      <!-- ── RIGHT: Naver Blog ── -->
-      <div class="panel" id="naver-panel">
+      <!-- ── RIGHT: Schedule Panel ── -->
+      <div class="panel" id="schedule-panel">
         <div class="panel-header">
-          <span class="panel-title">네이버 블로그</span>
-          <span class="panel-badge">Naver</span>
+          <span class="panel-title">발행 스케줄</span>
+          <span class="panel-badge">Schedule</span>
+          <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="loadSchedule()">새로고침</button>
         </div>
         <div class="panel-body">
-          <div class="right-panel-body" id="naver-panel-body">
-            <div class="naver-icon">N</div>
-            <div class="naver-blog-id" id="naver-blog-id-display">blog.naver.com/soulstore</div>
-            <div class="naver-desc" id="naver-desc">
-              네이버 블로그 글쓰기 페이지를<br/>팝업으로 엽니다.
-            </div>
-
-            <div class="naver-divider"></div>
-
-            <button class="btn btn-naver btn-naver-big" onclick="openNaverWrite()">
-              ✍️ 네이버 블로그 글쓰기 열기
-            </button>
-
-            <div class="naver-tips">
-              <p>
-                <strong>사용법</strong><br/>
-                1. 위 버튼으로 네이버 글쓰기 팝업 오픈<br/>
-                2. 가운데 편집창 HTML을 복사하여 붙여넣기<br/>
-                3. 네이버에서 발행
-              </p>
-            </div>
+          <!-- Unauthenticated notice -->
+          <div class="post-list-auth-notice" id="schedule-auth-notice">
+            <div class="lock-icon">🔒</div>
+            <div>구글 로그인이 필요합니다</div>
+            <div style="font-size:11px;">로그인 후 발행 스케줄을 확인할 수 있습니다.</div>
           </div>
+          <!-- Schedule list -->
+          <div id="schedule-list" class="schedule-list" style="display:none;overflow-y:auto;height:100%;padding:8px;"></div>
         </div>
       </div>
 
@@ -990,7 +1087,7 @@
 
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/blogger',
+      scope: 'https://www.googleapis.com/auth/blogger https://www.googleapis.com/auth/spreadsheets',
       callback: (tokenResponse) => {
         if (tokenResponse.error) {
           // 자동 로그인 실패 시 조용히 무시 (로그인 버튼 표시 유지)
@@ -1005,6 +1102,7 @@
         updateAuthUI(true);
         showToast('✅ Google 로그인 성공');
         loadPostList();
+        loadSchedule();
       },
       error_callback: (err) => {
         // 팝업 없이 실패하는 경우 (prior consent 없음 등) — 조용히 무시
@@ -1047,6 +1145,7 @@
     updateAuthUI(false);
     resetEditor();
     renderPostListAuth(); // show auth notice
+    updateScheduleAuthUI(); // show schedule auth notice
     showToast('로그아웃 되었습니다.');
   }
 
@@ -1099,8 +1198,10 @@
 
     if (accessToken) {
       loadPostList();
+      loadSchedule();
     } else {
       renderPostListAuth();
+      updateScheduleAuthUI();
     }
   }
 
@@ -1350,10 +1451,8 @@
 
   // ── Naver panel ────────────────────────────────────────
   function renderNaverPanel(cfg) {
-    document.getElementById('naver-blog-id-display').textContent =
-      `blog.naver.com/${cfg.blogId}`;
-    document.getElementById('naver-desc').innerHTML =
-      `<strong>${cfg.label}</strong><br/>네이버 블로그 글쓰기 페이지를<br/>팝업으로 엽니다.`;
+    // Naver panel has been replaced with schedule panel.
+    // cfg is kept for openNaverWrite() usage.
   }
 
   function openNaverWrite() {
@@ -1361,16 +1460,14 @@
     const blogId = cfg.naver.blogId;
     const writeUrl = `https://blog.naver.com/PostWriteForm.naver?blogId=${blogId}`;
 
-    // 오른쪽 네이버 패널의 화면상 실제 좌표 및 크기 계산 (screenX/Y 보정 포함)
-    const panelEl = document.getElementById('naver-panel');
-    const rect = panelEl ? panelEl.getBoundingClientRect() : { left: 0, top: 0, width: 420, height: 850 };
-    const popupW = Math.round(rect.width);
-    const popupH = Math.round(rect.height);
+    // 팝업 위치: 화면 중앙
+    const popupW = 900;
+    const popupH = 800;
     const screenLeft = window.screenX !== undefined ? window.screenX : (window.screenLeft || 0);
     const screenTop  = window.screenY !== undefined ? window.screenY : (window.screenTop  || 0);
     const chromeBarH = window.outerHeight - window.innerHeight;
-    const left = Math.round(screenLeft + rect.left);
-    const top  = Math.round(screenTop  + chromeBarH + rect.top);
+    const left = Math.round(screenLeft + (window.innerWidth - popupW) / 2);
+    const top  = Math.round(screenTop  + chromeBarH + (window.innerHeight - popupH) / 2);
 
     const features = `width=${popupW},height=${popupH},left=${left},top=${top},resizable=yes,scrollbars=yes`;
 
@@ -1383,6 +1480,140 @@
 
     popup.focus();
     showToast(`네이버 블로그 글쓰기 열기: ${blogId}`);
+  }
+
+  // ── Schedule Panel ─────────────────────────────────────
+  function updateScheduleAuthUI() {
+    const authNotice = document.getElementById('schedule-auth-notice');
+    const scheduleList = document.getElementById('schedule-list');
+    if (!accessToken) {
+      authNotice.classList.remove('hidden');
+      scheduleList.style.display = 'none';
+    } else {
+      authNotice.classList.add('hidden');
+      scheduleList.style.display = 'block';
+    }
+  }
+
+  async function loadSchedule() {
+    if (!accessToken || !currentBlogId) {
+      updateScheduleAuthUI();
+      return;
+    }
+    updateScheduleAuthUI();
+
+    const SPREADSHEET_ID = '1udn5v4CLYarCI3ILsfrmn84zVP3WuE3lUPWfWOON4oo';
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/schedule`;
+    try {
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (res.status === 401) {
+        accessToken = null;
+        updateAuthUI(false);
+        updateScheduleAuthUI();
+        showToast('인증이 만료되었습니다. 다시 로그인하세요.', true);
+        return;
+      }
+      const data = await res.json();
+      const values = data.values || [];
+      // values[0] is header row
+      // columns: A=schedule_id, B=product_key, C=blog_id, D=blog_name, E=planned_date, F=post_index, G=angle, H=status, I=task_id, J=post_url, K=published_at
+      const rows = values.slice(1); // skip header
+      // Filter by currentBlogId (column C, index 2)
+      const filtered = rows
+        .map((row, i) => ({ row, rowNum: i + 2 })) // rowNum is 1-indexed, data starts at row 2
+        .filter(({ row }) => row[2] === currentBlogId)
+        .sort((a, b) => (a.row[4] || '').localeCompare(b.row[4] || '')); // sort by planned_date
+      renderSchedule(filtered);
+    } catch(e) {
+      console.error('Schedule load error', e);
+      showToast('스케줄 로드 실패: ' + e.message, true);
+    }
+  }
+
+  function renderSchedule(items) {
+    const container = document.getElementById('schedule-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (items.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">스케줄 항목이 없습니다.</div>';
+      return;
+    }
+
+    items.forEach(({ row, rowNum }) => {
+      const [scheduleId, productKey, blogId, blogName, plannedDate, postIndex, angle, status, taskId, postUrl, publishedAt] = row;
+      const item = document.createElement('div');
+      item.className = 'schedule-item';
+      const statusBadge = status === 'DONE'
+        ? '<span class="badge-done">완료</span>'
+        : '<span class="badge-pending">대기</span>';
+
+      if (status === 'DONE' && postUrl) {
+        item.innerHTML = `<div class="schedule-row clickable" onclick="window.open('${postUrl}','_blank')">
+          <span class="post-index">${postIndex || '?'}/10 회차</span>
+          <span class="planned-date">${plannedDate || ''}</span>
+          ${statusBadge}
+          <span class="angle-text">${angle || ''}</span>
+        </div>`;
+      } else if (status === 'PENDING') {
+        item.innerHTML = `<div class="schedule-row" data-row="${rowNum}" data-schedule-id="${scheduleId}">
+          <span class="post-index">${postIndex || '?'}/10 회차</span>
+          <span class="planned-date">${plannedDate || ''}</span>
+          ${statusBadge}
+          <span class="angle-text editable" onclick="editAngle(this, ${rowNum})">${angle || ''}</span>
+        </div>`;
+      } else {
+        item.innerHTML = `<div class="schedule-row">
+          <span class="post-index">${postIndex || '?'}/10 회차</span>
+          <span class="planned-date">${plannedDate || ''}</span>
+          ${statusBadge}
+          <span class="angle-text">${angle || ''}</span>
+        </div>`;
+      }
+      container.appendChild(item);
+    });
+  }
+
+  function editAngle(el, rowNum) {
+    const currentVal = el.textContent;
+    const parent = el.closest('.schedule-row');
+    // Replace angle text with input + save button
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentVal;
+    input.className = 'angle-input';
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '저장';
+    saveBtn.className = 'btn-save-angle';
+    saveBtn.onclick = () => saveAngle(rowNum, input.value, el);
+    el.replaceWith(input);
+    parent.appendChild(saveBtn);
+    input.focus();
+  }
+
+  async function saveAngle(rowNum, newAngle, originalEl) {
+    const SPREADSHEET_ID = '1udn5v4CLYarCI3ILsfrmn84zVP3WuE3lUPWfWOON4oo';
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/schedule!G${rowNum}?valueInputOption=RAW`;
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ values: [[newAngle]] })
+      });
+      if (res.ok) {
+        showToast('저장되었습니다.');
+        loadSchedule(); // refresh list
+      } else {
+        showToast('저장 실패', true);
+      }
+    } catch(e) {
+      showToast('저장 오류: ' + e.message, true);
+    }
   }
 
   // ── HTML Editor ───────────────────────────────────────
