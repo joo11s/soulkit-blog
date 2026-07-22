@@ -98,8 +98,14 @@
       color: var(--accent-dim);
       font-size: 11px;
       white-space: nowrap;
-      width: 56px;
+      width: 68px;
+      text-align: center;
       flex-shrink: 0;
+    }
+
+    .row2-spacer {
+      visibility: hidden;
+      pointer-events: none;
     }
 
     .smartstore-bar input {
@@ -876,7 +882,9 @@
           <button class="btn btn-secondary btn-send-one" onclick="handleSendOne('소울스토어')">전송</button>
         </div>
         <div class="biz-row2">
+          <label class="row2-spacer" aria-hidden="true">소울스토어</label>
           <input class="ss-url-input" data-mall="소울스토어" type="url" placeholder="스마트스토어 URL" />
+          <button class="btn btn-secondary btn-send-one row2-spacer" aria-hidden="true" tabindex="-1">전송</button>
         </div>
       </div>
       <div class="biz-col" data-mall="제이원투몰">
@@ -886,7 +894,9 @@
           <button class="btn btn-secondary btn-send-one" onclick="handleSendOne('제이원투몰')">전송</button>
         </div>
         <div class="biz-row2">
+          <label class="row2-spacer" aria-hidden="true">제이원투몰</label>
           <input class="ss-url-input" data-mall="제이원투몰" type="url" placeholder="스마트스토어 URL" />
+          <button class="btn btn-secondary btn-send-one row2-spacer" aria-hidden="true" tabindex="-1">전송</button>
         </div>
       </div>
       <div class="biz-col" data-mall="행복산업">
@@ -896,7 +906,9 @@
           <button class="btn btn-secondary btn-send-one" onclick="handleSendOne('행복산업')">전송</button>
         </div>
         <div class="biz-row2">
+          <label class="row2-spacer" aria-hidden="true">행복산업</label>
           <input class="ss-url-input" data-mall="행복산업" type="url" placeholder="스마트스토어 URL" />
+          <button class="btn btn-secondary btn-send-one row2-spacer" aria-hidden="true" tabindex="-1">전송</button>
         </div>
       </div>
       <button class="btn btn-send-all" onclick="handleSendAll()">▶ 전체 전송</button>
