@@ -1853,7 +1853,7 @@
     };
   }
 
-  async function sendMallRegister(mall, cafe24ProductNo, sharedProduct) {
+  async function sendMallRegister(mall, cafe24ProductNo, sharedProduct, originMall) {
     const { urlInput, smartstoreUrl } = getBizInputs(mall);
 
     if (!smartstoreUrl) {
@@ -1864,6 +1864,7 @@
 
     const payload = {
       mall,
+      origin_mall:       originMall || mall,
       cafe24_product_no: cafe24ProductNo,
       smartstore_url:    smartstoreUrl,
       shared_product:    !!sharedProduct,
@@ -1894,7 +1895,7 @@
       return;
     }
     showToast(`${mall} 전송 중...`);
-    const ok = await sendMallRegister(mall, cafe24ProductNo, false);
+    const ok = await sendMallRegister(mall, cafe24ProductNo, false, mall);
     if (ok) showToast(`✅ ${mall} 전송 완료 — 카페24 상품NO: ${cafe24ProductNo}`);
   }
 
@@ -1913,12 +1914,14 @@
 
     if (filled.length === 1) {
       // 공통 모드: 상품NO 1개만 입력됨 → 3사업자 전부 같은 상품NO로 복제 전송
+      // (카페24 실제 조회는 상품NO를 입력한 원래 사업자 계정 기준으로 한 번만 수행)
       sharedMode = true;
       const commonNo = filled[0].cafe24ProductNo;
-      targets = malls.map(mall => ({ mall, cafe24ProductNo: commonNo }));
+      const originMall = filled[0].mall;
+      targets = malls.map(mall => ({ mall, cafe24ProductNo: commonNo, originMall }));
     } else {
-      // 개별 모드: 상품NO를 입력한 사업자만 각자 값으로 전송
-      targets = filled.map(i => ({ mall: i.mall, cafe24ProductNo: i.cafe24ProductNo }));
+      // 개별 모드: 상품NO를 입력한 사업자만 각자 값으로, 각자 자기 카페24 계정에서 조회
+      targets = filled.map(i => ({ mall: i.mall, cafe24ProductNo: i.cafe24ProductNo, originMall: i.mall }));
     }
 
     const missingUrl = targets.filter(t => !getBizInputs(t.mall).smartstoreUrl);
@@ -1929,10 +1932,10 @@
     }
 
     showToast(sharedMode
-      ? `공통 상품으로 3사업자 전체 전송 중... (카페24 상품NO: ${targets[0].cafe24ProductNo})`
+      ? `공통 상품으로 3사업자 전체 전송 중... (카페24 상품NO: ${targets[0].cafe24ProductNo}, 조회 대상: ${targets[0].originMall})`
       : `전체 전송 중... (${targets.map(t => t.mall).join(', ')})`);
 
-    const results = await Promise.all(targets.map(t => sendMallRegister(t.mall, t.cafe24ProductNo, sharedMode)));
+    const results = await Promise.all(targets.map(t => sendMallRegister(t.mall, t.cafe24ProductNo, sharedMode, t.originMall)));
     const successCount = results.filter(Boolean).length;
     showToast(`✅ 전체 전송 완료 (${successCount}/${targets.length}건 성공)`);
   }
