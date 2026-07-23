@@ -912,7 +912,6 @@
           <button class="btn btn-secondary btn-send-one row2-spacer" aria-hidden="true" tabindex="-1">전송</button>
         </div>
       </div>
-      <button class="btn btn-send-all" onclick="handleSendAll()">▶ 전체 전송</button>
     </div>
 
     <!-- Google Login / User Info (right side) -->
@@ -1122,8 +1121,12 @@
     },
   };
 
-  // n8n webhook endpoint (기존 스마트스토어 작업 시작용)
-  const WEBHOOK_URL = 'https://n8n.wonflowai.com/webhook/happyj1-blog-register';
+  // n8n webhook endpoints — 사업자별 분리
+  const WEBHOOK_URLS = {
+    '소울스토어': 'https://n8n.wonflowai.com/webhook/happyj1-blog-register-soul',
+    '제이원투몰':  'https://n8n.wonflowai.com/webhook/happyj1-blog-register-jone',
+    '행복산업':   'https://n8n.wonflowai.com/webhook/happyj1-blog-register-happy',
+  };
 
   // ── State ──────────────────────────────────────────────
   let currentMall    = '소울스토어';
@@ -1871,7 +1874,8 @@
     };
 
     try {
-      const res = await fetch(WEBHOOK_URL, {
+      const webhookUrl = WEBHOOK_URLS[mall] || WEBHOOK_URLS['소울스토어'];
+      const res = await fetch(webhookUrl, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
@@ -1897,57 +1901,6 @@
     showToast(`${mall} 전송 중...`);
     const ok = await sendMallRegister(mall, cafe24ProductNo, false, mall);
     if (ok) showToast(`✅ ${mall} 전송 완료 — 카페24 상품NO: ${cafe24ProductNo}`);
-  }
-
-  async function handleSendAll() {
-    const malls = ['소울스토어', '제이원투몰', '행복산업'];
-    const inputs = malls.map(mall => ({ mall, ...getBizInputs(mall) }));
-    const filled = inputs.filter(i => i.cafe24ProductNo);
-
-    if (filled.length === 0) {
-      showToast('전송할 사업자의 카페24 상품NO를 하나 이상 입력해주세요.', true);
-      return;
-    }
-
-    let targets;
-    let sharedMode = false;
-
-    if (filled.length === 1) {
-      // 공통 모드: 상품NO 1개만 입력됨 → 3사업자 전부 같은 상품NO로 복제 전송
-      // (카페24 실제 조회는 상품NO를 입력한 원래 사업자 계정 기준으로 한 번만 수행)
-      sharedMode = true;
-      const commonNo = filled[0].cafe24ProductNo;
-      const originMall = filled[0].mall;
-      targets = malls.map(mall => ({ mall, cafe24ProductNo: commonNo, originMall }));
-    } else {
-      // 개별 모드: 상품NO를 입력한 사업자만 각자 값으로, 각자 자기 카페24 계정에서 조회
-      targets = filled.map(i => ({ mall: i.mall, cafe24ProductNo: i.cafe24ProductNo, originMall: i.mall }));
-    }
-
-    const missingUrl = targets.filter(t => !getBizInputs(t.mall).smartstoreUrl);
-    if (missingUrl.length > 0) {
-      showToast(`${missingUrl.map(t => t.mall).join(', ')}: 스마트스토어 URL을 입력해주세요.`, true);
-      getBizInputs(missingUrl[0].mall).urlInput?.focus();
-      return;
-    }
-
-    showToast(sharedMode
-      ? `공통 상품으로 3사업자 순차 전송 시작... (카페24 상품NO: ${targets[0].cafe24ProductNo}, 조회 대상: ${targets[0].originMall})`
-      : `순차 전송 시작... (${targets.map(t => t.mall).join(', ')})`);
-
-    // 구글시트 동시 append 충돌(경합) 방지를 위해 한 건씩 순서대로 전송 (완료 응답을 받은 뒤 다음 요청 발송, 매 건 사이 1.5초 여유)
-    const results = [];
-    for (let i = 0; i < targets.length; i++) {
-      const t = targets[i];
-      showToast(`(${i + 1}/${targets.length}) ${t.mall} 전송 중...`);
-      const ok = await sendMallRegister(t.mall, t.cafe24ProductNo, sharedMode, t.originMall);
-      results.push(ok);
-      if (i < targets.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-    }
-    const successCount = results.filter(Boolean).length;
-    showToast(`✅ 전체 전송 완료 (${successCount}/${targets.length}건 성공)`);
   }
 
   // ── Image Download Helpers ────────────────────────────
