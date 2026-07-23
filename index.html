@@ -1932,10 +1932,20 @@
     }
 
     showToast(sharedMode
-      ? `공통 상품으로 3사업자 전체 전송 중... (카페24 상품NO: ${targets[0].cafe24ProductNo}, 조회 대상: ${targets[0].originMall})`
-      : `전체 전송 중... (${targets.map(t => t.mall).join(', ')})`);
+      ? `공통 상품으로 3사업자 순차 전송 시작... (카페24 상품NO: ${targets[0].cafe24ProductNo}, 조회 대상: ${targets[0].originMall})`
+      : `순차 전송 시작... (${targets.map(t => t.mall).join(', ')})`);
 
-    const results = await Promise.all(targets.map(t => sendMallRegister(t.mall, t.cafe24ProductNo, sharedMode, t.originMall)));
+    // 구글시트 동시 append 충돌(경합) 방지를 위해 한 건씩 순서대로 전송 (완료 응답을 받은 뒤 다음 요청 발송, 매 건 사이 1.5초 여유)
+    const results = [];
+    for (let i = 0; i < targets.length; i++) {
+      const t = targets[i];
+      showToast(`(${i + 1}/${targets.length}) ${t.mall} 전송 중...`);
+      const ok = await sendMallRegister(t.mall, t.cafe24ProductNo, sharedMode, t.originMall);
+      results.push(ok);
+      if (i < targets.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
     const successCount = results.filter(Boolean).length;
     showToast(`✅ 전체 전송 완료 (${successCount}/${targets.length}건 성공)`);
   }
