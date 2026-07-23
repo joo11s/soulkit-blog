@@ -1128,6 +1128,17 @@
     '행복산업':   'https://n8n.wonflowai.com/webhook/happyj1-blog-register-happy',
   };
 
+  // ── 구글 시트 ID 매핑 (사업자별 분리) ────────────────────
+  const SPREADSHEET_IDS = {
+    '소울스토어': '1fx91lBj7zLagQw4Uoq6mjqTsaLciPk_jWNe6cDUFhog',
+    '제이원투몰': '1giNXocUnI_NVwHm0gf3TxOsghN7aG6YTSiftA7j9Q1I',
+    '행복산업':  '1dO8t4ItWmZc0rnzVYW3mpPvSriZAhxkYnarptPYF1FU',
+  };
+
+  function getSpreadsheetId() {
+    return SPREADSHEET_IDS[currentMall] || SPREADSHEET_IDS['소울스토어'];
+  }
+
   // ── State ──────────────────────────────────────────────
   let currentMall    = '소울스토어';
   let currentJ12Blog = '제이원매거진';
@@ -1577,7 +1588,7 @@
     }
     updateScheduleAuthUI();
 
-    const SPREADSHEET_ID = '1udn5v4CLYarCI3ILsfrmn84zVP3WuE3lUPWfWOON4oo';
+    const SPREADSHEET_ID = getSpreadsheetId();
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/schedule`;
     try {
       const res = await fetch(url, {
@@ -1724,7 +1735,7 @@
   }
 
   async function saveAngle(rowNum, newAngle, originalEl) {
-    const SPREADSHEET_ID = '1udn5v4CLYarCI3ILsfrmn84zVP3WuE3lUPWfWOON4oo';
+    const SPREADSHEET_ID = getSpreadsheetId();
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/schedule!G${rowNum}?valueInputOption=RAW`;
     try {
       const res = await fetch(url, {
